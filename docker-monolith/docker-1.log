@@ -1,0 +1,16 @@
+REPOSITORY                 TAG                 IMAGE ID            CREATED             SIZE
+yourname/ubuntu-tmp-file   latest              266a2661448c        3 minutes ago       119MB
+ubuntu                     16.04               a3551444fc85        4 days ago          119MB
+nginx                      latest              27a188018e18        2 weeks ago         109MB
+hello-world                latest              fce289e99eb9        4 months ago        1.84kB
+express42/otus-homeworks   latest              9e80c9b4facb        5 months ago        979MB
+
+В контейнере гораздо больше атрибутов. Все описывать не имеет смысла)
+Вот часть:
+Статус контейнера
+хэш контейнера
+время запуска
+слои оверлея
+хостнэйм
+переменные окружения
+параметры сети: адрес маска шлюз мас-адрес
