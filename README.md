@@ -37,4 +37,20 @@ base=https://github.com/docker/machine/releases/download/v0.16.0 &&
 - Launch gcloud init
 - Create auth file (`$HOME/.config/gcloud/application_default_credentials.json`) for docker-machine:
   + `gcloud auth application-default login`
+- export GOOGLE_PROJECT=docker-239319
+- Create VMachine:
+```
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+docker-host
+```
+- docker-machine ls                                                 NAME          ACTIVE   DRIVER   STATE     URL                       SWARM   DOCKER     ERRORS
+docker-host   -        google   Running   tcp://34.76.75.218:2376           v18.09.5
+- eval $(docker-machine env docker-host)
+- wget "https://raw.githubusercontent.com/express42/otus-snippets/master/hw-15/mongod.conf" -O mongod.conf
+- wget "https://raw.githubusercontent.com/express42/otus-snippets/master/hw-15/start.sh" -O start.sh
+- echo DATABASE_URL=127.0.0.1 > db_config
+- wget "https://raw.githubusercontent.com/express42/otus-snippets/master/hw-15/Dockerfile" -O Dockerfile
 - 
