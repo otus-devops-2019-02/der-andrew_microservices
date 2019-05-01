@@ -53,4 +53,24 @@ docker-host   -        google   Running   tcp://34.76.75.218:2376           v18.
 - wget "https://raw.githubusercontent.com/express42/otus-snippets/master/hw-15/start.sh" -O start.sh
 - echo DATABASE_URL=127.0.0.1 > db_config
 - wget "https://raw.githubusercontent.com/express42/otus-snippets/master/hw-15/Dockerfile" -O Dockerfile
+- docker build -t reddit:latest .
+- docker images -a
+```REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+<none>              <none>              da6a496c8e4d        2 minutes ago       681MB
+reddit              latest              f90fd636d015        2 minutes ago       681MB
+<none>              <none>              dcdab4ee70c8        2 minutes ago       681MB
+<none>              <none>              93ca68a58045        2 minutes ago       640MB
+<none>              <none>              b63b40c57dfb        2 minutes ago       640MB
+<none>              <none>              bc763856f9f5        2 minutes ago       640MB
+<none>              <none>              5ec700475c03        2 minutes ago       640MB
+<none>              <none>              904dae1720de        2 minutes ago       640MB
+<none>              <none>              f43551750187        3 minutes ago       637MB
+<none>              <none>              0b4af9bbc1f2        3 minutes ago       144MB
+ubuntu              16.04               a3551444fc85        4 days ago          119MB
+```
+- docker run --name reddit -d --network=host reddit:latest
+- docker-machine ls
+```NAME          ACTIVE   DRIVER   STATE     URL                       SWARM   DOCKER     ERRORS
+docker-host   *        google   Running   tcp://34.76.75.218:2376           v18.09.5
+```
 - 
