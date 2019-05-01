@@ -82,4 +82,46 @@ docker-host   *        google   Running   tcp://34.76.75.218:2376           v18.
 ```
 - Successful connect!
 http://34.76.75.218:9292/
-- 
+
+
+## Docker hub: регистрация
+
+- Login succeeded
+- docker tag reddit:latest avzhalnin/otus-reddit:1.0
+- docker push avzhalnin/otus-reddit:1.0
+- docker run --name reddit -d -p 9292:9292 avzhalnin/otus-reddit:1.0
+- It works!!!
+http://localhost:9292/
+- docker inspect avzhalnin/otus-reddit:1.0 -f '{{.ContainerConfig.Cmd}}'
+`[/bin/sh -c #(nop)  CMD ["/start.sh"]]`
+- docker exec -it reddit bash
+```root@e33bf6868203:/# mkdir /tmp/1111
+root@e33bf6868203:/# exit
+```
+- docker diff reddit
+```
+C /root
+A /root/.bash_history
+C /tmp
+A /tmp/1111
+A /tmp/mongodb-27017.sock
+C /var
+C /var/lib
+C /var/lib/mongodb
+A /var/lib/mongodb/_tmp
+A /var/lib/mongodb/journal
+A /var/lib/mongodb/journal/j._0
+A /var/lib/mongodb/journal/lsn
+A /var/lib/mongodb/journal/prealloc.1
+A /var/lib/mongodb/journal/prealloc.2
+A /var/lib/mongodb/local.0
+A /var/lib/mongodb/local.ns
+A /var/lib/mongodb/mongod.lock
+C /var/log
+A /var/log/mongod.log
+```
+- Clean:
+```
+docker-machine rm docker-host
+eval $(docker-machine env --unset)
+```
