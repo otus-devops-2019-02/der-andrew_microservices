@@ -14,4 +14,5 @@ der-andrew microservices repository
 - Go to slack channel DevOps team\andrey_zhalnin and say:
 
 '/github subscribe Otus-DevOps-2019-02/<GITHUB_USER>_infra commits:all'
+- After git push we'v got message in slack! All right!
 - 
