@@ -73,4 +73,13 @@ ubuntu              16.04               a3551444fc85        4 days ago          
 ```NAME          ACTIVE   DRIVER   STATE     URL                       SWARM   DOCKER     ERRORS
 docker-host   *        google   Running   tcp://34.76.75.218:2376           v18.09.5
 ```
+- Create VPC rule for puma:
+```gcloud compute firewall-rules create reddit-app \
+--allow tcp:9292 \
+--target-tags=docker-machine \
+--description="Allow PUMA connections" \
+--direction=INGRESS
+```
+- Successful connect!
+http://34.76.75.218:9292/
 - 
