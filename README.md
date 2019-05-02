@@ -30,3 +30,11 @@ base=https://github.com/docker/machine/releases/download/v0.16.0 &&
 - docker run -dt nginx:latest
 - docker kill $(docker ps -q)
 - docker rm $(docker ps -a -q)
+
+# Docker-2
+
+- Create project ID: docker-239319
+- Launch gcloud init
+- Create auth file (`$HOME/.config/gcloud/application_default_credentials.json`) for docker-machine:
+  + `gcloud auth application-default login`
+- 
