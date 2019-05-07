@@ -143,6 +143,13 @@ docker-host   -        google   Running   tcp://35.240.103.79:2376           v18
 - eval $(docker-machine env docker-host)
 - Мы в корне репозитория: pwd
 `/home/andrew/work/OTUS-201902-git/der-andrew_microservices`
+- Пересоздаём образы, т.к. всё почикали в прошлый раз)))
+- cd docker-monolith
+- docker build -t reddit:latest .
+- docker run --name reddit -d --network=host reddit:latest
+- Работает!!!
+http://35.240.103.79:9292/
+- Продолжаем выполнение дз.
 - wget 'https://github.com/express42/reddit/archive/microservices.zip'
 - unzip microservices.zip
 - rm -f microservices.zip
