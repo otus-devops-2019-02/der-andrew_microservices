@@ -149,6 +149,8 @@ docker-host   -        google   Running   tcp://35.240.103.79:2376           v18
 - docker run --name reddit -d --network=host reddit:latest
 - Работает!!!
 http://35.240.103.79:9292/
+- docker kill reddit
+- docker rm reddit -v
 - Продолжаем выполнение дз.
 - wget 'https://github.com/express42/reddit/archive/microservices.zip'
 - unzip microservices.zip
@@ -186,5 +188,51 @@ ENV COMMENT_DATABASE_HOST comment_db
 ENV COMMENT_DATABASE comments
 
 CMD ["puma"]
+```
+- Create ui/Dockerfile
+```
+FROM ruby:2.2
+RUN apt-get update -qq && apt-get install -y build-essential
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+
+WORKDIR $APP_HOME
+ADD Gemfile* $APP_HOME/
+RUN bundle install
+ADD . $APP_HOME
+
+ENV POST_SERVICE_HOST post
+ENV POST_SERVICE_PORT 5000
+ENV COMMENT_SERVICE_HOST comment
+ENV COMMENT_SERVICE_PORT 9292
+
+CMD ["puma"]
+```
+- docker pull mongo:latest
+- docker build -t avzhalnin/post:1.0 ./post-py
+```
+<...>
+Successfully built b4d01c05fcd3
+Successfully tagged avzhalnin/post:1.0
+```
+- docker build -t avzhalnin/comment:1.0 ./comment
+```
+ERROR!!!
+Failed to fetch http://deb.debian.org/debian/dists/jessie-updates/InRelease  Unable to find expected entry 'main/binary-amd64/Packages' in Release file
+```
+- Cure:
+```
+git diff --color comment/Dockerfile
+diff --git a/src/comment/Dockerfile b/src/comment/Dockerfile
+index 332bb55..31cd4fb 100644
+--- a/src/comment/Dockerfile
++++ b/src/comment/Dockerfile
+@@ -1,4 +1,5 @@
+ FROM ruby:2.2
++RUN printf "deb http://archive.debian.org/debian/ jessie main\ndeb-src http://archive.debian.org/debian/ jessie main\ndeb http://security.debian.org jessie/updates main\ndeb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
+ RUN apt-get update -qq && apt-get install -y build-essential
+ 
+ ENV APP_HOME /app
 ```
 - 
