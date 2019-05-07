@@ -230,9 +230,36 @@ index 332bb55..31cd4fb 100644
 +++ b/src/comment/Dockerfile
 @@ -1,4 +1,5 @@
  FROM ruby:2.2
-+RUN printf "deb http://archive.debian.org/debian/ jessie main\ndeb-src http://archive.debian.org/debian/ jessie main\ndeb http://security.debian.org jessie/updates main\ndeb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
++RUN printf "deb http://archive.debian.org/debian/ jessie main\n\
++deb-src http://archive.debian.org/debian/ jessie main\n\
++deb http://security.debian.org jessie/updates main\n\
++deb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
  RUN apt-get update -qq && apt-get install -y build-essential
  
  ENV APP_HOME /app
 ```
+- Same with ui:
+```
+git diff --color ui/Dockerfile
+diff --git a/src/ui/Dockerfile b/src/ui/Dockerfile
+index 3e02445..a5ea06d 100644
+--- a/src/ui/Dockerfile
++++ b/src/ui/Dockerfile
+@@ -1,4 +1,8 @@
+ FROM ruby:2.2
++RUN printf "deb http://archive.debian.org/debian/ jessie main\n\
++deb-src http://archive.debian.org/debian/ jessie main\n\
++deb http://security.debian.org jessie/updates main\n\
++deb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
+ RUN apt-get update -qq && apt-get install -y build-essential
+ 
+ ENV APP_HOME /app
+```
+- docker build -t avzhalnin/ui:1.0 ./ui
+```
+<...>
+Successfully built 9c54ca0b4ffc
+Successfully tagged avzhalnin/ui:1.0
+```
+- docker network create reddit
 - 
