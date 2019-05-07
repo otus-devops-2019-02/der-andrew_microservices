@@ -125,3 +125,27 @@ A /var/log/mongod.log
 docker-machine rm docker-host
 eval $(docker-machine env --unset)
 ```
+
+# Docker-образы Микросервисы
+- Create VMachine:
+```
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+docker-host
+```
+- docker-machine ls
+```
+NAME          ACTIVE   DRIVER   STATE     URL                        SWARM   DOCKER     ERRORS
+docker-host   -        google   Running   tcp://35.240.103.79:2376           v18.09.6   
+```
+- eval $(docker-machine env docker-host)
+- Мы в корне репозитория: pwd
+`/home/andrew/work/OTUS-201902-git/der-andrew_microservices`
+- wget 'https://github.com/express42/reddit/archive/microservices.zip'
+- unzip microservices.zip
+- rm -f microservices.zip
+- mv reddit-microservices src
+- cd src
+- 
