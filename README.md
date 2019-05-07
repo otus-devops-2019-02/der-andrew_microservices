@@ -262,4 +262,13 @@ Successfully built 9c54ca0b4ffc
 Successfully tagged avzhalnin/ui:1.0
 ```
 - docker network create reddit
+- Запускаем приложение:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:1.0
+```
+- It works again!!!
+http://35.240.103.79:9292/
 - 
