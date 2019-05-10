@@ -1,7 +1,12 @@
 FROM alpine:3.9
-RUN apt-get update \
-    && apt-get install -y ruby-full ruby-dev build-essential \
-    && gem install bundler --no-ri --no-rdoc
+RUN apk -U update \
+    && apk add --virtual build-dependencies \
+        build-base \
+        gcc \
+        wget \
+        git \
+    && apk add ruby-full ruby-dev \
+    && gem install bundler:1.17.2 --no-ri --no-rdoc
 
 ENV APP_HOME /app
 RUN mkdir $APP_HOME
