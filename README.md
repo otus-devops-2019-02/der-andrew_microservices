@@ -275,6 +275,8 @@ http://35.240.103.79:9292/
 
 ## Задание со звездой
 
+- Kill app:
+`docker kill $(docker ps -q)`
 - Улучшаем ui:
 ```
 FROM ubuntu:16.04
@@ -307,4 +309,13 @@ Successfully tagged avzhalnin/ui:2.0
 REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
 avzhalnin/ui        2.0                 ab1774f20a4a        28 seconds ago      449MB
 ```
+- Build ui from alpine and run app:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:3.0
+```
+- App is going fine
+http://35.240.103.79:9292/
 - 
