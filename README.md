@@ -318,4 +318,14 @@ docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:3.0
 ```
 - App is going fine
 http://35.240.103.79:9292/
-- 
+
+### Уменьшаем размер образа
+- Clean them all!!!
+`docker kill $(docker ps -q) && docker rm -v $(docker ps -aq)`
+- Make multistage build from busybox and run app:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
