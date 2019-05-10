@@ -332,6 +332,16 @@ docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
 - It works!!!
 http://35.240.103.79:9292/
 - Make multistage build comment and run app.
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
 - It works!!!
 http://35.240.103.79:9292/
 - Make multistage build post-py and run app.
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:2.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
