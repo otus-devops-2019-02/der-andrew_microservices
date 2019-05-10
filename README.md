@@ -345,3 +345,17 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:2.0
 docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
 docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+- It works!!!
+http://35.240.103.79:9292/
+
+## Создание вольюма
+- docker volume create reddit_db
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db \
+-v reddit_db:/data/db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:2.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
+- Посты на месте!
+http://35.240.103.79:9292/post/5cd5eefdcc58bc000ea1a234
