@@ -125,3 +125,237 @@ A /var/log/mongod.log
 docker-machine rm docker-host
 eval $(docker-machine env --unset)
 ```
+
+# Docker-образы Микросервисы
+- Create VMachine:
+```
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+docker-host
+```
+- docker-machine ls
+```
+NAME          ACTIVE   DRIVER   STATE     URL                        SWARM   DOCKER     ERRORS
+docker-host   -        google   Running   tcp://35.240.103.79:2376           v18.09.6   
+```
+- eval $(docker-machine env docker-host)
+- Мы в корне репозитория: pwd
+`/home/andrew/work/OTUS-201902-git/der-andrew_microservices`
+- Пересоздаём образы, т.к. всё почикали в прошлый раз)))
+- cd docker-monolith
+- docker build -t reddit:latest .
+- docker run --name reddit -d --network=host reddit:latest
+- Работает!!!
+http://35.240.103.79:9292/
+- docker kill reddit
+- docker rm reddit -v
+- Продолжаем выполнение дз.
+- wget 'https://github.com/express42/reddit/archive/microservices.zip'
+- unzip microservices.zip
+- rm -f microservices.zip
+- mv reddit-microservices src
+- cd src
+- Create post-py/Dockerfile
+```
+FROM python:3.6.0-alpine
+
+WORKDIR /app
+ADD . /app
+RUN apk add --no-cache build-base gcc
+RUN pip install -r /app/requirements.txt
+
+ENV POST_DATABASE_HOST post_db
+ENV POST_DATABASE posts
+
+ENTRYPOINT ["python3", "post_app.py"]
+```
+- Create comment/Dockerfile
+```
+FROM ruby:2.2
+RUN apt-get update -qq && apt-get install -y build-essential
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+
+ADD Gemfile* $APP_HOME/
+RUN bundle install
+ADD . $APP_HOME
+
+ENV COMMENT_DATABASE_HOST comment_db
+ENV COMMENT_DATABASE comments
+
+CMD ["puma"]
+```
+- Create ui/Dockerfile
+```
+FROM ruby:2.2
+RUN apt-get update -qq && apt-get install -y build-essential
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+
+WORKDIR $APP_HOME
+ADD Gemfile* $APP_HOME/
+RUN bundle install
+ADD . $APP_HOME
+
+ENV POST_SERVICE_HOST post
+ENV POST_SERVICE_PORT 5000
+ENV COMMENT_SERVICE_HOST comment
+ENV COMMENT_SERVICE_PORT 9292
+
+CMD ["puma"]
+```
+- docker pull mongo:latest
+- docker build -t avzhalnin/post:1.0 ./post-py
+```
+<...>
+Successfully built b4d01c05fcd3
+Successfully tagged avzhalnin/post:1.0
+```
+- docker build -t avzhalnin/comment:1.0 ./comment
+```
+ERROR!!!
+Failed to fetch http://deb.debian.org/debian/dists/jessie-updates/InRelease  Unable to find expected entry 'main/binary-amd64/Packages' in Release file
+```
+- Cure:
+```
+git diff --color comment/Dockerfile
+diff --git a/src/comment/Dockerfile b/src/comment/Dockerfile
+index 332bb55..31cd4fb 100644
+--- a/src/comment/Dockerfile
++++ b/src/comment/Dockerfile
+@@ -1,4 +1,5 @@
+ FROM ruby:2.2
++RUN printf "deb http://archive.debian.org/debian/ jessie main\n\
++deb-src http://archive.debian.org/debian/ jessie main\n\
++deb http://security.debian.org jessie/updates main\n\
++deb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
+ RUN apt-get update -qq && apt-get install -y build-essential
+ 
+ ENV APP_HOME /app
+```
+- Same with ui:
+```
+git diff --color ui/Dockerfile
+diff --git a/src/ui/Dockerfile b/src/ui/Dockerfile
+index 3e02445..a5ea06d 100644
+--- a/src/ui/Dockerfile
++++ b/src/ui/Dockerfile
+@@ -1,4 +1,8 @@
+ FROM ruby:2.2
++RUN printf "deb http://archive.debian.org/debian/ jessie main\n\
++deb-src http://archive.debian.org/debian/ jessie main\n\
++deb http://security.debian.org jessie/updates main\n\
++deb-src http://security.debian.org jessie/updates main" > /etc/apt/sources.list
+ RUN apt-get update -qq && apt-get install -y build-essential
+ 
+ ENV APP_HOME /app
+```
+- docker build -t avzhalnin/ui:1.0 ./ui
+```
+<...>
+Successfully built 9c54ca0b4ffc
+Successfully tagged avzhalnin/ui:1.0
+```
+- docker network create reddit
+- Запускаем приложение:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:1.0
+```
+- It works again!!!
+http://35.240.103.79:9292/
+
+
+## Задание со звездой
+
+- Kill app:
+`docker kill $(docker ps -q)`
+- Улучшаем ui:
+```
+FROM ubuntu:16.04
+RUN apt-get update \
+    && apt-get install -y ruby-full ruby-dev build-essential \
+    && gem install bundler --no-ri --no-rdoc
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+
+WORKDIR $APP_HOME
+ADD Gemfile* $APP_HOME/
+RUN bundle install
+ADD . $APP_HOME
+
+ENV POST_SERVICE_HOST post
+ENV POST_SERVICE_PORT 5000
+ENV COMMENT_SERVICE_HOST comment
+ENV COMMENT_SERVICE_PORT 9292
+
+CMD ["puma"]
+```
+- Rebuild ui:
+```
+docker build -t avzhalnin/ui:2.0 ./ui
+<...>
+Successfully built ab1774f20a4a
+Successfully tagged avzhalnin/ui:2.0
+
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+avzhalnin/ui        2.0                 ab1774f20a4a        28 seconds ago      449MB
+```
+- Build ui from alpine and run app:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:3.0
+```
+- App is going fine
+http://35.240.103.79:9292/
+
+### Уменьшаем размер образа
+- Clean them all!!!
+`docker kill $(docker ps -q) && docker rm -v $(docker ps -aq)`
+- Make multistage build ui and run app:
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
+- It works!!!
+http://35.240.103.79:9292/
+- Make multistage build comment and run app.
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
+- It works!!!
+http://35.240.103.79:9292/
+- Make multistage build post-py and run app.
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:2.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+- It works!!!
+http://35.240.103.79:9292/
+
+## Создание вольюма
+- docker volume create reddit_db
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db --name=post_db \
+-v reddit_db:/data/db mongo:latest
+docker run -d --network=reddit --network-alias=post --name=post avzhalnin/post:2.0
+docker run -d --network=reddit --network-alias=comment --name=comment avzhalnin/comment:2.0
+docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
+```
+- Посты на месте!
+http://35.240.103.79:9292/post/5cd5eefdcc58bc000ea1a234
