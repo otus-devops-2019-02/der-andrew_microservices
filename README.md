@@ -359,3 +359,91 @@ docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
 ```
 - Посты на месте!
 http://35.240.103.79:9292/post/5cd5eefdcc58bc000ea1a234
+
+
+# Docker: сети, docker-compose
+
+- Run `docker run -ti --rm --network none joffotron/docker-net-tools -c ifconfig`
+```
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+```
+- Run `docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig`
+```
+br-88e21dad0e20 Link encap:Ethernet  HWaddr 02:42:C9:2D:9B:49  
+          inet addr:172.18.0.1  Bcast:172.18.255.255  Mask:255.255.0.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+docker0   Link encap:Ethernet  HWaddr 02:42:21:84:27:5C  
+          inet addr:172.17.0.1  Bcast:172.17.255.255  Mask:255.255.0.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+ens4      Link encap:Ethernet  HWaddr 42:01:0A:84:00:06  
+          inet addr:10.132.0.6  Bcast:10.132.0.6  Mask:255.255.255.255
+          inet6 addr: fe80::4001:aff:fe84:6%32525/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1460  Metric:1
+          RX packets:2315 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1753 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:43266553 (41.2 MiB)  TX bytes:183277 (178.9 KiB)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1%32525/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+```
+- Run `docker-machine ssh docker-host ifconfig`. Output is the same.
+- Run `docker run --network host -d nginx` 4 раза. Тольк первый контейнер запущен, т.к. порт занят для остальных.
+- Остановили всех `docker kill $(docker ps -q)`
+- Run `docker-machine ssh docker-host sudo ln -s /var/run/docker/netns /var/run/netns`.
+- Теперь можно просматривать существующие в данный момент net-namespaces с помощью команды:
+`docker-machine ssh docker-host sudo ip netns`
+- Примечание: ip netns exec <namespace> <command> - позволит выполнять команды в выбранном namespace.
+
+## Bridge network driver
+
+- Run `docker network create reddit --driver bridge`
+- Запустили контейнеры с алиасами и всё заработало
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment  avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:1.0
+```
+http://35.240.103.79:9292/
+- Разделим сети front end и back end.
+- Создадим сети:
+```
+docker network create back_net --subnet=10.0.2.0/24
+docker network create front_net --subnet=10.0.1.0/24
+```
+- И запустим приложение.
+```
+docker run -d --network=front_net -p 9292:9292 --name ui  avzhalnin/ui:1.0
+docker run -d --network=back_net --name comment  avzhalnin/comment:1.0
+docker run -d --network=back_net --name post  avzhalnin/post:1.0
+docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+```
+- Не всё работает. Подключим контейнеры ко второй сети:
+```
+docker network connect front_net post
+docker network connect front_net comment
+```
+- Теперь работает как надо.
