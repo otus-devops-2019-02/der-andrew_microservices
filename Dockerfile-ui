@@ -1,0 +1,47 @@
+FROM alpine:3.9 AS build-bundler
+RUN apk -U update \
+    && apk add --virtual build-dependencies \
+        build-base \
+    && apk add ruby-full ruby-dev \
+    && gem install bundler:1.17.2 --no-ri --no-rdoc
+
+ENV APP_HOME /app
+RUN mkdir $APP_HOME
+
+WORKDIR $APP_HOME
+ADD Gemfile* $APP_HOME/
+RUN bundle install \
+    && tar -czf /tmp/bundler.tar.gz /usr/lib/ruby
+
+FROM alpine:3.9 AS build-ruby
+RUN apk -U update \
+    && apk add ruby \
+    && tar -czf /tmp/ruby.tar.gz /usr/bin /usr/sbin /usr/lib /usr/local
+
+FROM alpine:3.9
+
+ENV APP_HOME /app
+
+WORKDIR $APP_HOME
+
+COPY --from=build-bundler /tmp/bundler.tar.gz /app/
+COPY --from=build-bundler /$APP_HOME /$APP_HOME
+COPY --from=build-bundler \ 
+/usr/bin/j2bson \
+/usr/bin/tilt \
+/usr/bin/b2json \
+/usr/bin/rackup \
+/usr/bin/puma \
+/usr/bin/pumactl \
+/usr/bin/haml \
+/usr/bin/
+COPY --from=build-ruby /tmp/ruby.tar.gz /app/
+
+ADD . $APP_HOME
+
+ENV POST_SERVICE_HOST post
+ENV POST_SERVICE_PORT 5000
+ENV COMMENT_SERVICE_HOST comment
+ENV COMMENT_SERVICE_PORT 9292
+
+CMD tar -xzf /app/bundler.tar.gz -C / && tar -xzf /app/ruby.tar.gz -C / && /usr/bin/puma
