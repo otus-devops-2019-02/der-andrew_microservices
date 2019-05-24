@@ -1,0 +1,50 @@
+version: "3.7"
+
+volumes:
+  reddit-db:
+
+networks:
+  reddit:
+
+services:
+  post-db:
+    image: mongo:${MONGO_VER}
+    container_name: post-db
+    restart: always
+    networks:
+      reddit:
+        aliases:
+          - post_db
+          - commment_db 
+    volumes:
+      - ./reddit-db:/data/db
+
+  post:
+    build: ./post-py
+    image: ${USERNAME}/post:${POST_VER}
+    container_name: post
+    restart: always
+    networks:
+      reddit:
+        aliases:
+          - post
+
+  comment:
+    build: ./comment
+    image: ${USERNAME}/comment:${COMMENT_VER}
+    container_name: comment
+    restart: always
+    networks:
+      reddit:
+        aliases:
+          - comment
+
+  ui:
+    build: ./ui
+    image: ${USERNAME}/ui:${UI_VER}
+    container_name: ui
+    restart: always
+    networks:
+      reddit:
+    ports:
+      - 9292:9292
