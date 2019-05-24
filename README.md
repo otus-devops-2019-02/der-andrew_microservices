@@ -511,4 +511,50 @@ Chain DOCKER (2 references)
 pgrep -a docker-proxy
 4147 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
 ```
+
+## Docker-compose
+- Make docker-compose.yml
+```
+version: '3.3'
+services:
+  post_db:
+    image: mongo:3.2
+    volumes:
+      - post_db:/data/db
+    networks:
+      - reddit
+  ui:
+    build: ./ui
+    image: ${USERNAME}/ui:1.0
+    ports:
+      - 9292:9292/tcp
+    networks:
+      - reddit
+  post:
+    build: ./post-py
+    image: ${USERNAME}/post:1.0
+    networks:
+      - reddit
+  comment:
+    build: ./comment
+    image: ${USERNAME}/comment:1.0
+    networks:
+      - reddit
+
+volumes:
+  post_db:
+
+networks:
+  reddit:
+```
+- Kiil them all!
+`docker kill $(docker ps -q) && docker rm -v $(docker ps -aq)`
+- Run app:
+```
+export USERNAME=avzhalnin
+docker-compose up -d
+docker-compose ps
+```
+- App work good.
+http://35.240.103.79:9292/
 - 
