@@ -359,3 +359,207 @@ docker run -d --network=reddit -p 9292:9292 --name=ui avzhalnin/ui:4.0
 ```
 - Посты на месте!
 http://35.240.103.79:9292/post/5cd5eefdcc58bc000ea1a234
+
+
+# Docker: сети, docker-compose
+
+- Run `docker run -ti --rm --network none joffotron/docker-net-tools -c ifconfig`
+```
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+```
+- Run `docker run -ti --rm --network host joffotron/docker-net-tools -c ifconfig`
+```
+br-88e21dad0e20 Link encap:Ethernet  HWaddr 02:42:C9:2D:9B:49  
+          inet addr:172.18.0.1  Bcast:172.18.255.255  Mask:255.255.0.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+docker0   Link encap:Ethernet  HWaddr 02:42:21:84:27:5C  
+          inet addr:172.17.0.1  Bcast:172.17.255.255  Mask:255.255.0.0
+          UP BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+ens4      Link encap:Ethernet  HWaddr 42:01:0A:84:00:06  
+          inet addr:10.132.0.6  Bcast:10.132.0.6  Mask:255.255.255.255
+          inet6 addr: fe80::4001:aff:fe84:6%32525/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1460  Metric:1
+          RX packets:2315 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1753 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:43266553 (41.2 MiB)  TX bytes:183277 (178.9 KiB)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1%32525/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+```
+- Run `docker-machine ssh docker-host ifconfig`. Output is the same.
+- Run `docker run --network host -d nginx` 4 раза. Тольк первый контейнер запущен, т.к. порт занят для остальных.
+- Остановили всех `docker kill $(docker ps -q)`
+- Run `docker-machine ssh docker-host sudo ln -s /var/run/docker/netns /var/run/netns`.
+- Теперь можно просматривать существующие в данный момент net-namespaces с помощью команды:
+`docker-machine ssh docker-host sudo ip netns`
+- Примечание: ip netns exec <namespace> <command> - позволит выполнять команды в выбранном namespace.
+
+## Bridge network driver
+
+- Run `docker network create reddit --driver bridge`
+- Запустили контейнеры с алиасами и всё заработало
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:latest
+docker run -d --network=reddit --network-alias=post avzhalnin/post:1.0
+docker run -d --network=reddit --network-alias=comment  avzhalnin/comment:1.0
+docker run -d --network=reddit -p 9292:9292 avzhalnin/ui:1.0
+```
+http://35.240.103.79:9292/
+- Разделим сети front end и back end.
+- Создадим сети:
+```
+docker network create back_net --subnet=10.0.2.0/24
+docker network create front_net --subnet=10.0.1.0/24
+```
+- И запустим приложение.
+```
+docker run -d --network=front_net -p 9292:9292 --name ui  avzhalnin/ui:1.0
+docker run -d --network=back_net --name comment  avzhalnin/comment:1.0
+docker run -d --network=back_net --name post  avzhalnin/post:1.0
+docker run -d --network=back_net --name mongo_db --network-alias=post_db --network-alias=comment_db mongo:latest
+```
+- Не всё работает. Подключим контейнеры ко второй сети:
+```
+docker network connect front_net post
+docker network connect front_net comment
+```
+- Теперь работает как надо.
+
+## Bridge network driver
+
+- Install bridge-utils on docker-host:
+`sudo apt-get update && sudo apt-get install bridge-utils`
+- List network:
+```
+docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+2055c4603b8f        back_net            bridge              local
+d1fb3aee3aad        bridge              bridge              local
+9efbe4af6de4        front_net           bridge              local
+cac42989932c        host                host                local
+1d925b9ebf94        none                null                local
+88e21dad0e20        reddit              bridge              local
+```
+- List bridge:
+```
+brctl show
+bridge name     bridge id               STP enabled     interfaces
+br-2055c4603b8f         8000.024297c185d8       no              veth0c7081d
+                                                        veth80eb4ef
+                                                        veth9e2b985
+br-88e21dad0e20         8000.0242106a9006       no
+br-9efbe4af6de4         8000.02426bfe3c08       no              veth5e51ba1
+                                                        vetha9d4544
+                                                        vethc64e84e
+docker0         8000.0242ca46e495       no
+```
+- List iptables:
+```
+iptables -nvL -t nat
+Chain PREROUTING (policy ACCEPT 134 packets, 8290 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+   12  4319 DOCKER     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT 2 packets, 76 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 4 packets, 256 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 DOCKER     all  --  *      *       0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT 112 packets, 6736 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0           
+   24  1734 MASQUERADE  all  --  *      !br-9efbe4af6de4  10.0.1.0/24          0.0.0.0/0           
+    0     0 MASQUERADE  all  --  *      !br-88e21dad0e20  172.18.0.0/16        0.0.0.0/0           
+    0     0 MASQUERADE  all  --  *      !br-2055c4603b8f  10.0.2.0/24          0.0.0.0/0           
+    0     0 MASQUERADE  tcp  --  *      *       10.0.1.2             10.0.1.2             tcp dpt:9292
+
+Chain DOCKER (2 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 RETURN     all  --  docker0 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-9efbe4af6de4 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-88e21dad0e20 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-2055c4603b8f *       0.0.0.0/0            0.0.0.0/0           
+    0     0 DNAT       tcp  --  !br-9efbe4af6de4 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:9292 to:10.0.1.2:9292
+```
+- List proxy:
+```
+pgrep -a docker-proxy
+4147 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
+```
+
+## Docker-compose
+- Make docker-compose.yml
+```
+version: '3.3'
+services:
+  post_db:
+    image: mongo:3.2
+    volumes:
+      - post_db:/data/db
+    networks:
+      - reddit
+  ui:
+    build: ./ui
+    image: ${USERNAME}/ui:1.0
+    ports:
+      - 9292:9292/tcp
+    networks:
+      - reddit
+  post:
+    build: ./post-py
+    image: ${USERNAME}/post:1.0
+    networks:
+      - reddit
+  comment:
+    build: ./comment
+    image: ${USERNAME}/comment:1.0
+    networks:
+      - reddit
+
+volumes:
+  post_db:
+
+networks:
+  reddit:
+```
+- Kiil them all!
+`docker kill $(docker ps -q) && docker rm -v $(docker ps -aq)`
+- Run app:
+```
+export USERNAME=avzhalnin
+docker-compose up -d
+docker-compose ps
+```
+- App work good.
+http://35.240.103.79:9292/
+- Add .env file
+- App work fine.
+http://35.240.103.79:9292/
+- Базовое имя проекта можно задать двумя способами:
+1. Через переменную `COMPOSE_PROJECT_NAME`.
+2. Использую ключ `-p` docker-compose.

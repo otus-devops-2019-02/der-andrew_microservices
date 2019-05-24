@@ -1,0 +1,29 @@
+FROM python:3.6.0-alpine AS build
+
+WORKDIR /app
+ADD . /app
+RUN apk add --no-cache build-base gcc
+RUN pip install -r /app/requirements.txt \
+  && tar -czf /tmp/python.tar.gz \
+     /usr/local/lib/python3.6 \
+     /usr/local/bin/chardetect \
+     /usr/local/bin/flask
+
+#FROM frolvlad/alpine-python3
+FROM python:3.6.0-alpine
+
+#COPY --from=build /usr/local/lib/python3.6 /usr/local/lib/python3.6
+#COPY --from=build \
+#/usr/local/bin/chardetect \
+#/usr/local/bin/flask \
+#/usr/local/bin/
+COPY --from=build /tmp/python.tar.gz /tmp
+
+WORKDIR /app
+ADD . /app
+
+ENV POST_DATABASE_HOST post_db
+ENV POST_DATABASE posts
+
+#ENTRYPOINT ["python3", "post_app.py"]
+CMD tar -xzf /tmp/python.tar.gz -C / && /usr/local/bin/python3 post_app.py
