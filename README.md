@@ -447,3 +447,68 @@ docker network connect front_net post
 docker network connect front_net comment
 ```
 - Теперь работает как надо.
+
+## Bridge network driver
+
+- Install bridge-utils on docker-host:
+`sudo apt-get update && sudo apt-get install bridge-utils`
+- List network:
+```
+docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+2055c4603b8f        back_net            bridge              local
+d1fb3aee3aad        bridge              bridge              local
+9efbe4af6de4        front_net           bridge              local
+cac42989932c        host                host                local
+1d925b9ebf94        none                null                local
+88e21dad0e20        reddit              bridge              local
+```
+- List bridge:
+```
+brctl show
+bridge name     bridge id               STP enabled     interfaces
+br-2055c4603b8f         8000.024297c185d8       no              veth0c7081d
+                                                        veth80eb4ef
+                                                        veth9e2b985
+br-88e21dad0e20         8000.0242106a9006       no
+br-9efbe4af6de4         8000.02426bfe3c08       no              veth5e51ba1
+                                                        vetha9d4544
+                                                        vethc64e84e
+docker0         8000.0242ca46e495       no
+```
+- List iptables:
+```
+iptables -nvL -t nat
+Chain PREROUTING (policy ACCEPT 134 packets, 8290 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+   12  4319 DOCKER     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT 2 packets, 76 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 4 packets, 256 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 DOCKER     all  --  *      *       0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT 112 packets, 6736 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0           
+   24  1734 MASQUERADE  all  --  *      !br-9efbe4af6de4  10.0.1.0/24          0.0.0.0/0           
+    0     0 MASQUERADE  all  --  *      !br-88e21dad0e20  172.18.0.0/16        0.0.0.0/0           
+    0     0 MASQUERADE  all  --  *      !br-2055c4603b8f  10.0.2.0/24          0.0.0.0/0           
+    0     0 MASQUERADE  tcp  --  *      *       10.0.1.2             10.0.1.2             tcp dpt:9292
+
+Chain DOCKER (2 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 RETURN     all  --  docker0 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-9efbe4af6de4 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-88e21dad0e20 *       0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  br-2055c4603b8f *       0.0.0.0/0            0.0.0.0/0           
+    0     0 DNAT       tcp  --  !br-9efbe4af6de4 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:9292 to:10.0.1.2:9292
+```
+- List proxy:
+```
+pgrep -a docker-proxy
+4147 /usr/bin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 9292 -container-ip 10.0.1.2 -container-port 9292
+```
+- 
