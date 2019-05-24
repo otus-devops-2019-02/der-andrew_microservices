@@ -557,4 +557,9 @@ docker-compose ps
 ```
 - App work good.
 http://35.240.103.79:9292/
-- 
+- Add .env file
+- App work fine.
+http://35.240.103.79:9292/
+- Базовое имя проекта можно задать двумя способами:
+1. Через переменную `COMPOSE_PROJECT_NAME`.
+2. Использую ключ `-p` docker-compose.
