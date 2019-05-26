@@ -15,7 +15,7 @@ der-andrew microservices repository
 
 '/github subscribe Otus-DevOps-2019-02/<GITHUB_USER>_infra commits:all'
 - After git push we'v got message in slack! All right!
-- прощлый репозиторий мне так и не удалось подключить к трэвису. в этот раз, кроме строчки из ДЗ `travis encrypt "devops-team-otus:**********" --add notifications.slack.rooms --com` я подключил строчку, предложенную самим трэвисом `travis encrypt "devops-team-otus:**********" --add notifications.slack --com` и.... О чудо! Трэвис заговорил! Что явилось серебряной пулей сказать трудно.
+- прошлый репозиторий мне так и не удалось подключить к трэвису. в этот раз, кроме строчки из ДЗ `travis encrypt "devops-team-otus:**********" --add notifications.slack.rooms --com` я подключил строчку, предложенную самим трэвисом `travis encrypt "devops-team-otus:**********" --add notifications.slack --com` и.... О чудо! Трэвис заговорил! Что явилось серебряной пулей сказать трудно.
 
 ## Start Docker!
 - Install docker-machine
@@ -633,4 +633,10 @@ docker-compose up -d
 ```
 - Проверяем.
 http://34.76.136.75/
+- Создали пароль пользователя, группу, проект.
+- Добавили ремоут в микросервисы.
+```
+git remote add gitlab http://34.76.136.75/homework/example.git
+git push gitlab gitlab-ci-1
+```
 - 
