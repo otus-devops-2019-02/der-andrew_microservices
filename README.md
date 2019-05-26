@@ -685,11 +685,12 @@ git push gitlab gitlab-ci-1
 ## Dev окружение.
 
 - Изменили пайплайн и добавили окружение.
-- Создалось окружение 
+- Создалось окружение dev.
 
 `http://34.76.136.75/homework/example/environments`
 
 ## Staging и Production
 
 - Изменили пайплайн и добавили окружение.
-- 
+- Создались окружения stage and production.
+- Условия и ограничения.
