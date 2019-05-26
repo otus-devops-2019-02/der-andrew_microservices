@@ -680,4 +680,8 @@ git add reddit/
 git commit -m “Add reddit app”
 git push gitlab gitlab-ci-1
 ```
-- 
+- Добавили тест в пайплайн.
+
+## Dev окружение.
+
+- Изменили пайплайн и добавили окружение.
