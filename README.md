@@ -590,4 +590,47 @@ gcloud compute firewall-rules create default-allow-https --direction=INGRESS --p
 - Настроим окружение для docker-machine:
 
 `eval $(docker-machine env gitlab-ci)`
+
+## Подготавливаем окружение gitlab-ci
+
+- Login to vmachine:
+```
+docker-machine ssh gitlab-ci
+```
+- Create tree and docker-compose.yml
+```
+sudo su
+apt-get install -y docker-compose
+mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+cd /srv/gitlab/
+cat << EOF > docker-compose.yml
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://$(curl ifconfig.me)'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+EOF
+```
+
+## Запускаем gitlab-ci
+- Login to vmachine:
+```
+docker-machine ssh gitlab-ci
+```
+- Run docker-compose.yml
+```
+docker-compose up -d
+```
+- Проверяем.
+http://34.76.136.75/
 - 
