@@ -699,4 +699,35 @@ git push gitlab gitlab-ci-1
     - /^\d+\.\d+\.\d+/
 ```
 - Без тэга пайплайн запустился без stage and prod.
-- 
+- Добавляем тег:
+```
+git commit -a -m 'test: #4 add logout button to profile page'
+git tag 2.4.10
+git push gitlab gitlab-ci-1 --tags
+```
+- С тэгами запустился весь пайплайн.
+
+## Динамические окружения
+
+- Добавили джоб и бранч bugfix
+
+## Удаляем VM
+
+- Создали docker-compose.yml для Gilab.
+```
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://34.76.136.75'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+```
