@@ -6,7 +6,7 @@ stages:
   - deploy
 
 variables:
-  DATABASE_URL:'mongodb://mongo/user_posts'
+  DATABASE_URL: 'mongodb://mongo/user_posts'
 
 before_script:
   - cd reddit
