@@ -639,4 +639,38 @@ http://34.76.136.75/
 git remote add gitlab http://34.76.136.75/homework/example.git
 git push gitlab gitlab-ci-1
 ```
+- Add pipeline definition in .gitlab-ci.yml file.
+
+## Run Runner.
+- Получили токен для runner:
+
+`DgzD4iyAJZxf_YsVPWjy`
+- На сервере gitlab-ci запустить раннер, выполнив:
+```
+docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest
+```
+- Register runner:
+
+`docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false`
+```
+Runtime platform                                    arch=amd64 os=linux pid=30 revision=5a147c92 version=11.11.1
+Running in system-mode.                            
+Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/):
+http://34.76.136.75/
+Please enter the gitlab-ci token for this runner:
+DgzD4iyAJZxf_YsVPWjy
+Please enter the gitlab-ci description for this runner:
+[f829ea2fce49]: my-runner
+Please enter the gitlab-ci tags for this runner (comma separated):
+linux,xenial,ubuntu,docker
+Registering runner... succeeded                     runner=DgzD4iyA
+Please enter the executor: docker-ssh, shell, docker-ssh+machine, docker+machine, kubernetes, docker, docker-windows, parallels, ssh, virtualbox:
+docker
+Please enter the default Docker image (e.g. ruby:2.1):
+alpine:latest
+Runner registered successfully. Feel free to start it, but if it's running already the config should be automatically reloaded! 
+```
 - 
