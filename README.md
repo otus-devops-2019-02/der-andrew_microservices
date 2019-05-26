@@ -562,4 +562,32 @@ http://35.240.103.79:9292/
 http://35.240.103.79:9292/
 - Базовое имя проекта можно задать двумя способами:
 1. Через переменную `COMPOSE_PROJECT_NAME`.
-2. Использую ключ `-p` docker-compose.
+2. Используя ключ `-p` docker-compose.
+
+# Устройство Gitlab-CI
+
+## Инсталляция Gitlab CI
+
+- Указываем в каком проекте создавать машину и правила файрвола:
+
+`export GOOGLE_PROJECT=docker-239319`
+- Create VMachine:
+```
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-disk-size 100 \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+--google-tags http-server,https-server \
+gitlab-ci
+```
+- Create VPC firewall rules http,https:
+```
+gcloud compute firewall-rules create default-allow-http --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:80 --source-ranges=0.0.0.0/0 --target-tags=http-server
+
+gcloud compute firewall-rules create default-allow-https --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:443 --source-ranges=0.0.0.0/0 --target-tags=https-server
+```
+- Настроим окружение для docker-machine:
+
+`eval $(docker-machine env gitlab-ci)`
+- 
