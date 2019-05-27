@@ -15,7 +15,7 @@ der-andrew microservices repository
 
 '/github subscribe Otus-DevOps-2019-02/<GITHUB_USER>_infra commits:all'
 - After git push we'v got message in slack! All right!
-- прощлый репозиторий мне так и не удалось подключить к трэвису. в этот раз, кроме строчки из ДЗ `travis encrypt "devops-team-otus:**********" --add notifications.slack.rooms --com` я подключил строчку, предложенную самим трэвисом `travis encrypt "devops-team-otus:**********" --add notifications.slack --com` и.... О чудо! Трэвис заговорил! Что явилось серебряной пулей сказать трудно.
+- прошлый репозиторий мне так и не удалось подключить к трэвису. в этот раз, кроме строчки из ДЗ `travis encrypt "devops-team-otus:**********" --add notifications.slack.rooms --com` я подключил строчку, предложенную самим трэвисом `travis encrypt "devops-team-otus:**********" --add notifications.slack --com` и.... О чудо! Трэвис заговорил! Что явилось серебряной пулей сказать трудно.
 
 ## Start Docker!
 - Install docker-machine
@@ -562,4 +562,172 @@ http://35.240.103.79:9292/
 http://35.240.103.79:9292/
 - Базовое имя проекта можно задать двумя способами:
 1. Через переменную `COMPOSE_PROJECT_NAME`.
-2. Использую ключ `-p` docker-compose.
+2. Используя ключ `-p` docker-compose.
+
+# Устройство Gitlab-CI
+
+## Инсталляция Gitlab CI
+
+- Указываем в каком проекте создавать машину и правила файрвола:
+
+`export GOOGLE_PROJECT=docker-239319`
+- Create VMachine:
+```
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-disk-size 100 \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+--google-tags http-server,https-server \
+gitlab-ci
+```
+- Create VPC firewall rules http,https:
+```
+gcloud compute firewall-rules create default-allow-http --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:80 --source-ranges=0.0.0.0/0 --target-tags=http-server
+
+gcloud compute firewall-rules create default-allow-https --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:443 --source-ranges=0.0.0.0/0 --target-tags=https-server
+```
+- Настроим окружение для docker-machine:
+
+`eval $(docker-machine env gitlab-ci)`
+
+## Подготавливаем окружение gitlab-ci
+
+- Login to vmachine:
+```
+docker-machine ssh gitlab-ci
+```
+- Create tree and docker-compose.yml
+```
+sudo su
+apt-get install -y docker-compose
+mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+cd /srv/gitlab/
+cat << EOF > docker-compose.yml
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://$(curl ifconfig.me)'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+EOF
+```
+
+## Запускаем gitlab-ci
+- Login to vmachine:
+```
+docker-machine ssh gitlab-ci
+```
+- Run docker-compose.yml
+```
+docker-compose up -d
+```
+- Проверяем.
+http://34.76.136.75/
+- Создали пароль пользователя, группу, проект.
+- Добавили ремоут в микросервисы.
+```
+git remote add gitlab http://34.76.136.75/homework/example.git
+git push gitlab gitlab-ci-1
+```
+- Add pipeline definition in .gitlab-ci.yml file.
+
+## Run Runner.
+- Получили токен для runner:
+
+`DgzD4iyAJZxf_YsVPWjy`
+- На сервере gitlab-ci запустить раннер, выполнив:
+```
+docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest
+```
+- Register runner:
+
+`docker exec -it gitlab-runner gitlab-runner register --run-untagged --locked=false`
+```
+Runtime platform                                    arch=amd64 os=linux pid=30 revision=5a147c92 version=11.11.1
+Running in system-mode.                            
+Please enter the gitlab-ci coordinator URL (e.g. https://gitlab.com/):
+http://34.76.136.75/
+Please enter the gitlab-ci token for this runner:
+DgzD4iyAJZxf_YsVPWjy
+Please enter the gitlab-ci description for this runner:
+[f829ea2fce49]: my-runner
+Please enter the gitlab-ci tags for this runner (comma separated):
+linux,xenial,ubuntu,docker
+Registering runner... succeeded                     runner=DgzD4iyA
+Please enter the executor: docker-ssh, shell, docker-ssh+machine, docker+machine, kubernetes, docker, docker-windows, parallels, ssh, virtualbox:
+docker
+Please enter the default Docker image (e.g. ruby:2.1):
+alpine:latest
+Runner registered successfully. Feel free to start it, but if it's running already the config should be automatically reloaded! 
+```
+- Добавим исходный код reddit в репозиторий:
+```
+git clone https://github.com/express42/reddit.git && rm -rf ./reddit/.git
+git add reddit/
+git commit -m “Add reddit app”
+git push gitlab gitlab-ci-1
+```
+- Добавили тест в пайплайн.
+
+## Dev окружение.
+
+- Изменили пайплайн и добавили окружение.
+- Создалось окружение dev.
+
+`http://34.76.136.75/homework/example/environments`
+
+## Staging и Production
+
+- Изменили пайплайн и добавили окружение.
+- Создались окружения stage and production.
+- Условия и ограничения.
+```
+  only:
+    - /^\d+\.\d+\.\d+/
+```
+- Без тэга пайплайн запустился без stage and prod.
+- Добавляем тег:
+```
+git commit -a -m 'test: #4 add logout button to profile page'
+git tag 2.4.10
+git push gitlab gitlab-ci-1 --tags
+```
+- С тэгами запустился весь пайплайн.
+
+## Динамические окружения
+
+- Добавили джоб и бранч bugfix
+
+## Удаляем VM
+
+- Создали docker-compose.yml для Gilab.
+```
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://34.76.136.75'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+```
