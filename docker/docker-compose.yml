@@ -20,7 +20,6 @@ services:
       - ./reddit-db:/data/db
 
   post:
-    build: ./post-py
     image: ${USERNAME}/post:${POST_VER}
     container_name: post
     restart: always
@@ -30,7 +29,6 @@ services:
           - post
 
   comment:
-    build: ./comment
     image: ${USERNAME}/comment:${COMMENT_VER}
     container_name: comment
     restart: always
@@ -40,7 +38,6 @@ services:
           - comment
 
   ui:
-    build: ./ui
     image: ${USERNAME}/ui:${UI_VER}
     container_name: ui
     restart: always

@@ -731,3 +731,48 @@ web:
     - '/srv/gitlab/logs:/var/log/gitlab'
     - '/srv/gitlab/data:/var/opt/gitlab'
 ```
+
+# Введение в мониторинг. Задание №20
+
+## Подготовка окружения
+
+- Создадим правило фаервола для Prometheus и Puma:
+```
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+```
+- Создадим Docker хост в GCE и настроим локальное окружение на работу с ним
+```
+export GOOGLE_PROJECT=docker-239319
+# create docker host
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west1-b \
+    docker-host
+
+# configure local env
+eval $(docker-machine env docker-host)
+```
+- Запуск Prometheus
+```
+docker run --rm -p 9090:9090 -d --name prometheus prom/prometheus:v2.1.0
+```
+- Заходим в UI
+http://35.187.32.118:9090/graph
+- Stop container!
+`docker stop prometheus`
+
+## Переупорядочим структуру директорий
+- Выполним:
+```
+cd home/andrew/work/OTUS-201902-git/der-andrew_microservices
+mkdir docker
+git mv docker-monolith docker
+git mv src/docker-compose.yml docker
+git mv src/.env.example docker
+mv src/docker-compose.* docker
+mv src/.env docker
+mkdir monitoring
+echo .env > docker/.gitignore
+```
