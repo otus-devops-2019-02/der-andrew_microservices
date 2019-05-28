@@ -821,4 +821,6 @@ for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
 - All work good.
 http://35.187.32.118:9292/
 http://35.187.32.118:9090/graph
+- Add new service node-exporter
+- Add new target for prometheus: node-exporter
 - 
