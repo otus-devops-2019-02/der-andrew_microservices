@@ -776,3 +776,48 @@ mv src/.env docker
 mkdir monitoring
 echo .env > docker/.gitignore
 ```
+
+## Создание Docker образа
+- Create Dockerfile
+```
+mkdir docker/prometheus
+cat << EOF > docker/prometheus/Dockerfile
+FROM prom/prometheus:v2.1.0
+ADD prometheus.yml /etc/prometheus/
+EOF
+```
+- Create prometheus.yml
+```
+---
+global:
+  scrape_interval: '5s'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+        - 'localhost:9090'
+
+  - job_name: 'ui'
+    static_configs:
+      - targets:
+        - 'ui:9292'
+
+  - job_name: 'comment'
+    static_configs:
+      - targets:
+        - 'comment:9292'
+```
+- В директории prometheus собираем Docker образ:
+```
+export USER_NAME=avzhalnin
+docker build -t $USER_NAME/prometheus .
+```
+- Build dockers
+```
+cd home/andrew/work/OTUS-201902-git/der-andrew_microservices
+for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
+```
+- All work good.
+http://35.187.32.118:9292/
+http://35.187.32.118:9090/graph
