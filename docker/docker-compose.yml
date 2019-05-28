@@ -15,6 +15,9 @@ services:
     restart: always
     networks:
       prom-net:
+        aliases:
+          - post_db
+          - commment_db 
       reddit:
         aliases:
           - post_db
@@ -28,6 +31,8 @@ services:
     restart: always
     networks:
       prom-net:
+        aliases:
+          - post
       reddit:
         aliases:
           - post
@@ -38,6 +43,8 @@ services:
     restart: always
     networks:
       prom-net:
+        aliases:
+          - comment
       reddit:
         aliases:
           - comment
@@ -48,12 +55,17 @@ services:
     restart: always
     networks:
       prom-net:
+        aliases:
+          - ui
       reddit:
+        aliases:
+          - ui
     ports:
       - 9292:9292
 
   prometheus:
     image: ${USER_NAME}/prometheus
+    container_name: prometheus
     restart: always
     networks:
       prom-net:
