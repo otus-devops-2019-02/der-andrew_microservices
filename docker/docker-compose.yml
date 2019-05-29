@@ -17,11 +17,11 @@ services:
       prom-net:
         aliases:
           - post_db
-          - commment_db 
+          - comment_db
       reddit:
         aliases:
           - post_db
-          - commment_db 
+          - comment_db
     volumes:
       - ./reddit-db:/data/db
 
