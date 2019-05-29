@@ -823,4 +823,15 @@ http://35.187.32.118:9292/
 http://35.187.32.118:9090/graph
 - Add new service node-exporter
 - Add new target for prometheus: node-exporter
-- 
+
+## завершение задания
+- Пушим образы в dockerhub:
+```
+docker login
+for i in ui comment post prometheus; do echo $i; docker push avzhalnin/$i; done
+```
+- Ссылки:
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/ui
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
