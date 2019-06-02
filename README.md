@@ -854,4 +854,11 @@ docker-machine ip docker-host
 ```
 - IP адрес нового хоста: `104.155.92.73`.
 - Разделим docker compose файлы на приложение и мониторинг.
--  
+- Добавим cAdvisor в конфигурацию Prometheus.
+- Пересоберем образ Prometheus с обновленной конфигурацией:
+```
+export USER_NAME=avzhalnin
+cd monitoring/prometheus
+docker build -t $USER_NAME/prometheus .
+```
+- 

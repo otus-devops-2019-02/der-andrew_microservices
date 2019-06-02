@@ -1,12 +1,12 @@
 version: "3.3"
 
 volumes:
-  reddit-db:
   prometheus_data:
 
 networks:
-  reddit:
   prom-net:
+
+services:
 
   prometheus:
     image: ${USER_NAME}/prometheus
