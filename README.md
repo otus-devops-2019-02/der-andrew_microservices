@@ -835,3 +835,23 @@ https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/ui
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
+
+
+# №21 Мониторинг приложения и инфраструктуры
+
+- Подготовка окуружения:
+```
+export GOOGLE_PROJECT=docker-239319
+
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+docker-host
+
+eval $(docker-machine env docker-host)
+docker-machine ip docker-host
+```
+- IP адрес нового хоста: `104.155.92.73`.
+- Разделим docker compose файлы на приложение и мониторинг.
+-  
