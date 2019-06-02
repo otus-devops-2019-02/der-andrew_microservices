@@ -867,7 +867,7 @@ cd docker
 docker-compose up -d
 docker-compose -f docker-compose-monitoring.yml up -d
 ```
-- Создадим правела файрвола VPC:
+- Создадим правила файрвола VPC:
 ```
 gcloud compute firewall-rules create prometheus-default --allow tcp:9090
 gcloud compute firewall-rules create puma-default --allow tcp:9292
@@ -882,4 +882,26 @@ cAdvisor
 http://104.155.92.73:8080/containers/
 http://104.155.92.73:8080/metrics
 - Добавим сервис Grafana для визуализации метрик Prometheus.
+- Создадим правило файрвола VPC для Grafana:
+```
+gcloud compute firewall-rules create grafana-default --allow tcp:3000
+```
+- Grafana is works!
+http://104.155.92.73:3000/login
+- Подключим дашборд:
+```
+mkdir -p monitoring/grafana/dashboards
+wget 'https://grafana.com/api/dashboards/893/revisions/5/download' -O monitoring/grafana/dashboards/DockerMonitoring.json
+```
+- Добавим информацию о post-сервисе в конфигурацию Prometheus.
+- Пересоберём Prometheus:
+```
+cd monitoring/prometheus
+docker build -t $USER_NAME/prometheus .
+```
+- Пересоздадим нашу Docker инфраструктуру мониторинга:
+```
+docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f docker-compose-monitoring.yml up -d
+```
 - 
