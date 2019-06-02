@@ -904,4 +904,9 @@ docker build -t $USER_NAME/prometheus .
 docker-compose -f docker-compose-monitoring.yml down
 docker-compose -f docker-compose-monitoring.yml up -d
 ```
+- Добавили графики в дашборд с запросами:
+```
+rate(ui_request_count{http_status=~"^[45].*"}[1m])
+rate(ui_request_count{http_status=~".*"}[1m])
+```
 - 
