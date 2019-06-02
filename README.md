@@ -861,4 +861,25 @@ export USER_NAME=avzhalnin
 cd monitoring/prometheus
 docker build -t $USER_NAME/prometheus .
 ```
+- Запустим сервисы:
+```
+cd docker
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Создадим правела файрвола VPC:
+```
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
+```
+- Приложение и мониторинго работают кака надо:
+Приложение
+http://104.155.92.73:9292/
+Prometheus
+http://104.155.92.73:9090/graph
+cAdvisor
+http://104.155.92.73:8080/containers/
+http://104.155.92.73:8080/metrics
+- Добавим сервис Grafana для визуализации метрик Prometheus.
 - 

@@ -2,6 +2,7 @@ version: "3.3"
 
 volumes:
   prometheus_data:
+  grafana_data:
 
 networks:
   prom-net:
@@ -55,3 +56,20 @@ services:
       - '/var/lib/docker/:/var/lib/docker:ro'
     ports:
       - '8080:8080'
+
+  grafana:
+    image: grafana/grafana:5.0.0
+    container_name: grafana
+    networks:
+      prom-net:
+        aliases:
+          - grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
