@@ -909,4 +909,8 @@ docker-compose -f docker-compose-monitoring.yml up -d
 rate(ui_request_count{http_status=~"^[45].*"}[1m])
 rate(ui_request_count{http_status=~".*"}[1m])
 ```
+- Добавили графики в дашборд с запросами:
+```
+histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m])) by (le))
+```
 - 
