@@ -40,3 +40,18 @@ networks:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    container_name: cadvisor
+    networks:
+      prom-net:
+        aliases:
+          - cadvisor
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
