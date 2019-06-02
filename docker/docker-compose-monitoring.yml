@@ -1,0 +1,42 @@
+version: "3.3"
+
+volumes:
+  reddit-db:
+  prometheus_data:
+
+networks:
+  reddit:
+  prom-net:
+
+  prometheus:
+    image: ${USER_NAME}/prometheus
+    container_name: prometheus
+    restart: always
+    networks:
+      prom-net:
+    ports:
+      - '9090:9090'
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=1d'
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    container_name: node-exporter
+    restart: always
+    user: root
+    networks:
+      prom-net:
+        aliases:
+          - node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
