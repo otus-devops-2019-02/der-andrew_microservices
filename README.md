@@ -920,4 +920,26 @@ histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))
 rate(comment_count[1h])
 rate(post_count[1h])
 ```
-- 
+
+## Alerting
+- Configure alertmanager for prometheus:
+```
+mkdir monitoring/alertmanager
+cat << EOF > monitoring/alertmanager/Dockerfile
+FROM prom/alertmanager:v0.14.0
+ADD config.yml /etc/alertmanager/
+EOF
+
+cat <<- EOF > monitoring/alertmanager/config.yml
+global:
+  slack_api_url: 'https://hooks.slack.com/services/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'
+
+route:
+  receiver: 'slack-notifications'
+
+receivers:
+- name: 'slack-notifications'
+  slack_configs:
+  - channel: '#userchannel'
+EOF
+```
