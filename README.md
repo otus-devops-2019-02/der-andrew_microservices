@@ -949,4 +949,36 @@ USER_NAME=avzhalnin
 docker build -t $USER_NAME/alertmanager .
 ```
 - Добавим новый сервис в компоуз файл мониторинга.
+- Создадим файл alerts.yml
+```
+cat <<- EOF > monitoring/prometheus/alerts.yml
+groups:
+  - name: alert.rules
+    rules:
+    - alert: InstanceDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: page
+      annotations:
+        description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute'
+        summary: 'Instance {{ $labels.instance }} down'
+EOF
+```
+- Даоавим в Dockerfile Prometheus-а
+```
+ADD alerts.yml /etc/prometheus/
+```
+- Добавим информацию о правилах, в конфиг Prometheus `prometheus.yml`
+```
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "alertmanager:9093"
+```
 - 
