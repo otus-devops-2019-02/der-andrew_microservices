@@ -85,7 +85,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A"
@@ -294,7 +294,7 @@
     "list": []
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
@@ -325,5 +325,5 @@
   "timezone": "",
   "title": "UI_Service_Monitoring",
   "uid": "vd0HGoGZk",
-  "version": 5
+  "version": 6
 }
