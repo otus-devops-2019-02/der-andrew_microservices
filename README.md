@@ -932,7 +932,7 @@ EOF
 
 cat <<- EOF > monitoring/alertmanager/config.yml
 global:
-  slack_api_url: 'https://hooks.slack.com/services/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'
+  slack_api_url: 'https://hooks.slack.com/services/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'
 
 route:
   receiver: 'slack-notifications'
@@ -940,6 +940,13 @@ route:
 receivers:
 - name: 'slack-notifications'
   slack_configs:
-  - channel: '#userchannel'
+  - channel: '#andrey_zhalnin'
 EOF
 ```
+- Build alertmanager
+```
+USER_NAME=avzhalnin
+docker build -t $USER_NAME/alertmanager .
+```
+- Добавим новый сервис в компоуз файл мониторинга.
+- 

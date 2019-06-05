@@ -45,6 +45,7 @@ services:
   cadvisor:
     image: google/cadvisor:v0.29.0
     container_name: cadvisor
+    restart: always
     networks:
       prom-net:
         aliases:
@@ -60,6 +61,7 @@ services:
   grafana:
     image: grafana/grafana:5.0.0
     container_name: grafana
+    restart: always
     networks:
       prom-net:
         aliases:
@@ -73,3 +75,16 @@ services:
       - prometheus
     ports:
       - 3000:3000
+
+  alertmanager:
+    image: ${USER_NAME}/alertmanager
+    container_name: alertmanager
+    restart: always
+    networks:
+      prom-net:
+        aliases:
+          - alertmanager
+    ports:
+    - 9093:9093
+    command:
+    - '--config.file=/etc/alertmanager/config.yml'
