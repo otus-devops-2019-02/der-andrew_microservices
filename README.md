@@ -981,4 +981,20 @@ alerting:
     - targets:
       - "alertmanager:9093"
 ```
+- ReBuild prometheus
+```
+USER_NAME=avzhalnin
+docker build -t $USER_NAME/prometheus .
+```
+- Restart monitoring dockers:
+```
+docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Создадим правила фаервола VPC:
+```
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
+```
+- Можно зайти по ссылке:
+http://104.155.92.73:9093/#/alerts
 - 
