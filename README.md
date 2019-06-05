@@ -911,6 +911,13 @@ rate(ui_request_count{http_status=~".*"}[1m])
 ```
 - Добавили графики в дашборд с запросами:
 ```
-histogram_quantile(0.95, sum(rate(ui_request_latency_seconds_bucket[5m])) by (le))
+histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))
+```
+
+## Мониторинг бизнесс-логики
+- Добавили графики в дашборд с запросами:
+```
+rate(comment_count[1h])
+rate(post_count[1h])
 ```
 - 
