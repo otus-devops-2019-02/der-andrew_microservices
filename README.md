@@ -997,4 +997,17 @@ gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
 ```
 - Можно зайти по ссылке:
 http://104.155.92.73:9093/#/alerts
-- 
+- Пушим образы в GitHub:
+```
+docker push $USER_NAME/ui
+docker push $USER_NAME/comment
+docker push $USER_NAME/post
+docker push $USER_NAME/prometheus
+docker push $USER_NAME/alertmanager
+```
+- Links:
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/ui
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/alertmanager
