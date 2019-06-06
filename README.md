@@ -835,3 +835,179 @@ https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/ui
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
+
+
+# №21 Мониторинг приложения и инфраструктуры
+
+- Подготовка окуружения:
+```
+export GOOGLE_PROJECT=docker-239319
+
+docker-machine create --driver google \
+--google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+--google-machine-type n1-standard-1 \
+--google-zone europe-west1-b \
+docker-host
+
+eval $(docker-machine env docker-host)
+docker-machine ip docker-host
+```
+- IP адрес нового хоста: `104.155.92.73`.
+- Разделим docker compose файлы на приложение и мониторинг.
+- Добавим cAdvisor в конфигурацию Prometheus.
+- Пересоберем образ Prometheus с обновленной конфигурацией:
+```
+export USER_NAME=avzhalnin
+cd monitoring/prometheus
+docker build -t $USER_NAME/prometheus .
+```
+- Запустим сервисы:
+```
+cd docker
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Создадим правила файрвола VPC:
+```
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
+```
+- Приложение и мониторинго работают кака надо:
+Приложение
+http://104.155.92.73:9292/
+Prometheus
+http://104.155.92.73:9090/graph
+cAdvisor
+http://104.155.92.73:8080/containers/
+http://104.155.92.73:8080/metrics
+- Добавим сервис Grafana для визуализации метрик Prometheus.
+- Создадим правило файрвола VPC для Grafana:
+```
+gcloud compute firewall-rules create grafana-default --allow tcp:3000
+```
+- Grafana is works!
+http://104.155.92.73:3000/login
+- Подключим дашборд:
+```
+mkdir -p monitoring/grafana/dashboards
+wget 'https://grafana.com/api/dashboards/893/revisions/5/download' -O monitoring/grafana/dashboards/DockerMonitoring.json
+```
+- Добавим информацию о post-сервисе в конфигурацию Prometheus.
+- Пересоберём Prometheus:
+```
+cd monitoring/prometheus
+docker build -t $USER_NAME/prometheus .
+```
+- Пересоздадим нашу Docker инфраструктуру мониторинга:
+```
+docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Добавили графики в дашборд с запросами:
+```
+rate(ui_request_count{http_status=~"^[45].*"}[1m])
+rate(ui_request_count{http_status=~".*"}[1m])
+```
+- Добавили графики в дашборд с запросами:
+```
+histogram_quantile(0.95, sum(rate(ui_request_response_time_bucket[5m])) by (le))
+```
+
+## Мониторинг бизнесс-логики
+- Добавили графики в дашборд с запросами:
+```
+rate(comment_count[1h])
+rate(post_count[1h])
+```
+
+## Alerting
+- Configure alertmanager for prometheus:
+```
+mkdir monitoring/alertmanager
+cat << EOF > monitoring/alertmanager/Dockerfile
+FROM prom/alertmanager:v0.14.0
+ADD config.yml /etc/alertmanager/
+EOF
+
+cat <<- EOF > monitoring/alertmanager/config.yml
+global:
+  slack_api_url: 'https://hooks.slack.com/services/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'
+
+route:
+  receiver: 'slack-notifications'
+
+receivers:
+- name: 'slack-notifications'
+  slack_configs:
+  - channel: '#andrey_zhalnin'
+EOF
+```
+- Build alertmanager
+```
+USER_NAME=avzhalnin
+docker build -t $USER_NAME/alertmanager .
+```
+- Добавим новый сервис в компоуз файл мониторинга.
+- Создадим файл alerts.yml
+```
+cat <<- EOF > monitoring/prometheus/alerts.yml
+groups:
+  - name: alert.rules
+    rules:
+    - alert: InstanceDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: page
+      annotations:
+        description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute'
+        summary: 'Instance {{ $labels.instance }} down'
+EOF
+```
+- Даоавим в Dockerfile Prometheus-а
+```
+ADD alerts.yml /etc/prometheus/
+```
+- Добавим информацию о правилах, в конфиг Prometheus `prometheus.yml`
+```
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "alertmanager:9093"
+```
+- ReBuild prometheus
+```
+USER_NAME=avzhalnin
+docker build -t $USER_NAME/prometheus .
+```
+- Restart monitoring dockers:
+```
+docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+- Создадим правила фаервола VPC:
+```
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
+```
+- Можно зайти по ссылке:
+http://104.155.92.73:9093/#/alerts
+- Пушим образы в GitHub:
+```
+docker push $USER_NAME/ui
+docker push $USER_NAME/comment
+docker push $USER_NAME/post
+docker push $USER_NAME/prometheus
+docker push $USER_NAME/alertmanager
+```
+- Links:
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/ui
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
+https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/alertmanager
