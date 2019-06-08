@@ -1080,4 +1080,43 @@ EOF
 
 docker-compose -f docker/docker-compose-logging.yml config
 ```
-- 
+- Fluentd.
+```
+mkdir -p logging/fluentd
+
+cat <<- EOF > logging/fluentd/Dockerfile
+FROM fluent/fluentd:v0.12
+RUN gem install fluent-plugin-elasticsearch --no-rdoc --no-ri --version 1.9.5
+RUN gem install fluent-plugin-grok-parser --no-rdoc --no-ri --version 1.0.0
+ADD fluent.conf /fluentd/etc
+EOF
+
+cat <<- EOF > logging/fluentd/fluent.conf
+<source>
+  @type forward
+  port 24224
+  bind 0.0.0.0
+</source>
+
+<match *.**>
+  @type copy
+  <store>
+    @type elasticsearch
+    host elasticsearch
+    port 9200
+    logstash_format true
+    logstash_prefix fluentd
+    logstash_dateformat %Y%m%d
+    include_tag_key true
+    type_name access_log
+    tag_key @log_name
+    flush_interval 1s
+  </store>
+  <store>
+    @type stdout
+  </store>
+</match>
+EOF
+
+
+```
