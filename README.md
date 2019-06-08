@@ -1011,3 +1011,20 @@ https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/alertmanager
+
+# Логирование и распределенная трассировка №23
+
+## Подготовка
+
+- Клонироввали новые сорцы приложения:
+```
+git clone git@github.com:express42/reddit.git src
+git checkout logging
+rm -fdr src/.git
+```
+- Добавили в **/src/post-py/Dockerfile** установку пакетов gcc и musl-dev
+- Собираем все образы:
+```
+for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
+```
+- 
