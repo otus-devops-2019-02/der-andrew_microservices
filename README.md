@@ -1049,4 +1049,35 @@ eval $(docker-machine env logging)
 
 docker-machine ip logging; # 35.202.57.233
 ```
+
+## Логирование Docker контейнеров
+
+- Создадим отдельный compose-файл для нашей системы логирования в папке docker/
+```
+export USER_NAME=avzhalnin
+
+cat <<- EOF > docker/docker-compose-logging.yml
+version: '3'
+services:
+  fluentd:
+    image: \${USER_NAME}/fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+
+  elasticsearch:
+    image: elasticsearch
+    expose:
+      - 9200
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: kibana
+    ports:
+      - "5601:5601"
+EOF
+
+docker-compose -f docker/docker-compose-logging.yml config
+```
 - 
