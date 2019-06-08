@@ -1117,6 +1117,16 @@ cat <<- EOF > logging/fluentd/fluent.conf
   </store>
 </match>
 EOF
-
-
 ```
+- Build Fluentd.
+```
+(cd logging/fluentd && docker build -t $USER_NAME/fluentd .)
+```
+- Правим `.env` файл, меняем тэги на `logging` и запускаем приложения.
+```
+cd docker
+docker-compose up -d
+```
+- It works!!!
+http://35.202.57.233:9292/
+- 
