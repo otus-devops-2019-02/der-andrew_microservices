@@ -1146,4 +1146,28 @@ http://35.202.57.233:9292/
   key_name log
 </filter>
 ```
-- 
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
+
+## Неструктруированные логи
+
+- Добавили драйвер логирования fluentd в post.
+```
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
+```
+- Перезапустим ui.
+- Добавили regex фильтр.
+```
+<filter service.ui>
+  @type parser
+  format /\[(?<time>[^\]]*)\]  (?<level>\S+) (?<user>\S+)[\W]*service=(?<service>\S+)[\W]*event=(?<event>\S+)[\W]*(?:path=(?<path>\S+)[\W]*)?request_id=(?<request_id>\S+)[\W]*(?:remote_addr=(?<remote_addr>\S+)[\W]*)?(?:method= (?<method>\S+)[\W]*)?(?:response_status=(?<response_status>\S+)[\W]*)?(?:message='(?<message>[^\']*)[\W]*)?/'
+  key_name log
+</filter>
+```

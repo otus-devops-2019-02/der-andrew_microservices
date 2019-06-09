@@ -67,3 +67,8 @@ services:
           - ui
     ports:
       - 9292:9292
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
