@@ -1137,4 +1137,5 @@ http://35.202.57.233:9292/
         fluentd-address: localhost:24224
         tag: service.post
 ```
+- Перезапустим все сервисиы.
 - 

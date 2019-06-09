@@ -8,7 +8,7 @@ services:
       - "24224:24224/udp"
 
   elasticsearch:
-    image: elasticsearch:7.1.1
+    image: elasticsearch:5.6
     container_name: elasticsearch
     expose:
       - 9200
@@ -16,7 +16,7 @@ services:
       - "9200:9200"
 
   kibana:
-    image: kibana:7.1.1
+    image: kibana:5.6
     container_name: kibana
     ports:
       - "5601:5601"
