@@ -1138,4 +1138,12 @@ http://35.202.57.233:9292/
         tag: service.post
 ```
 - Перезапустим все сервисиы.
+- Добавили фильтр в fluentd:
+```
+<filter service.post>
+  @type parser
+  format json
+  key_name log
+</filter>
+```
 - 
