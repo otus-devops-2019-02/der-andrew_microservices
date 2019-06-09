@@ -2,18 +2,21 @@ version: '3'
 services:
   fluentd:
     image: ${USER_NAME}/fluentd
+    container_name: fluentd
     ports:
       - "24224:24224"
       - "24224:24224/udp"
 
   elasticsearch:
-    image: elasticsearch
+    image: elasticsearch:7.1.1
+    container_name: elasticsearch
     expose:
       - 9200
     ports:
       - "9200:9200"
 
   kibana:
-    image: kibana
+    image: kibana:7.1.1
+    container_name: kibana
     ports:
       - "5601:5601"
