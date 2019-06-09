@@ -1129,4 +1129,12 @@ docker-compose up -d
 ```
 - It works!!!
 http://35.202.57.233:9292/
+- Добавили драйвер логирования fluentd в post.
+```
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
+```
 - 

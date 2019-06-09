@@ -36,6 +36,11 @@ services:
       reddit:
         aliases:
           - post
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
 
   comment:
     image: ${USER_NAME}/comment:${COMMENT_VER}
