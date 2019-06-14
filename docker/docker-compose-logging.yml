@@ -1,5 +1,19 @@
 version: '3'
+
 services:
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    networks:
+      prom-net:
+        aliases:
+          - zipkin
+      reddit:
+        aliases:
+          - zipkin
+    ports:
+      - "9411:9411"
+
   fluentd:
     image: ${USER_NAME}/fluentd
     container_name: fluentd

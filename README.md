@@ -1198,3 +1198,18 @@ docker-compose -f docker-compose-logging.yml up -d
 (cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
 docker-compose -f docker-compose-logging.yml up -d
 ```
+
+## Задание со звездой. Распределённый трейсинг: Zipkin.
+- Добавили сервис zipkin и переменную для включения zipkin в приложениях:
+```
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+```
+- Перестартуем весь балаган:
+```
+docker-compose -f docker-compose.yml -f docker-compose-logging.yml down
+docker-compose -f docker-compose.yml -f docker-compose-logging.yml up -d
+```
+- Зашли в UI zipkin.
+http://35.202.57.233:9411/zipkin/
+- Посмотрели спаны приложения.
