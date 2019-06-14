@@ -1171,3 +1171,30 @@ docker-compose -f docker-compose-logging.yml up -d
   key_name log
 </filter>
 ```
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
+- Добавили ещё Гроку:
+```
+<filter service.ui>
+  @type parser
+  key_name log
+  format grok
+  grok_pattern %{RUBY_LOGGER}
+</filter>
+
+<filter service.ui>
+  @type parser
+  format grok
+  grok_pattern service=%{WORD:service} \| event=%{WORD:event} \| request_id=%{GREEDYDATA:request_id} \| message='%{GREEDYDATA:message}'
+  key_name message
+  reserve_data true
+</filter>
+```
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
