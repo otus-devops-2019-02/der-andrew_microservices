@@ -1213,3 +1213,33 @@ docker-compose -f docker-compose.yml -f docker-compose-logging.yml up -d
 - Зашли в UI zipkin.
 http://35.202.57.233:9411/zipkin/
 - Посмотрели спаны приложения.
+
+
+# Введение в Kubernetes №25
+
+- Создание манифестов.
+```
+mkdir -p kubernetes/reddit
+
+cat <<- EOF > post-deployment.yml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: post-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: post
+  template:
+    metadata:
+      name: post
+      labels:
+        app: post
+    spec:
+      containers:
+      - image: chromko/post
+        name: post
+EOF
+```
