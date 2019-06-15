@@ -1,4 +1,5 @@
-docker-compose.yml
+docker-compose.yml.gist
+.env
 build_info.txt
 prometheus/
 

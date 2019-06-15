@@ -1011,3 +1011,205 @@ https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/comment
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/post
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/prometheus
 https://cloud.docker.com/u/avzhalnin/repository/docker/avzhalnin/alertmanager
+
+# Логирование и распределенная трассировка №23
+
+## Подготовка
+
+- Клонироввали новые сорцы приложения:
+```
+mkdir _archive
+git mv src _archive
+git clone git@github.com:express42/reddit.git src
+git checkout logging
+rm -fdr src/.git
+cp -ru --copy-contents _archive/src src; # only newer files!!!
+```
+- Добавили в **/src/post-py/Dockerfile** установку пакетов gcc и musl-dev
+- Собираем все образы:
+```
+for i in ui post-py comment; do cd src/$i; bash docker_build.sh; cd -; done
+```
+
+## Подготовка окружения
+
+- Создадим докер хост:
+```
+export GOOGLE_PROJECT=docker-239319
+
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-open-port 5601/tcp \
+    --google-open-port 9292/tcp \
+    --google-open-port 9411/tcp \
+    logging
+
+eval $(docker-machine env logging)
+
+docker-machine ip logging; # 35.202.57.233
+```
+
+## Логирование Docker контейнеров
+
+- Создадим отдельный compose-файл для нашей системы логирования в папке docker/
+```
+export USER_NAME=avzhalnin
+
+cat <<- EOF > docker/docker-compose-logging.yml
+version: '3'
+services:
+  fluentd:
+    image: \${USER_NAME}/fluentd
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+
+  elasticsearch:
+    image: elasticsearch
+    expose:
+      - 9200
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: kibana
+    ports:
+      - "5601:5601"
+EOF
+
+docker-compose -f docker/docker-compose-logging.yml config
+```
+- Fluentd.
+```
+mkdir -p logging/fluentd
+
+cat <<- EOF > logging/fluentd/Dockerfile
+FROM fluent/fluentd:v0.12
+RUN gem install fluent-plugin-elasticsearch --no-rdoc --no-ri --version 1.9.5
+RUN gem install fluent-plugin-grok-parser --no-rdoc --no-ri --version 1.0.0
+ADD fluent.conf /fluentd/etc
+EOF
+
+cat <<- EOF > logging/fluentd/fluent.conf
+<source>
+  @type forward
+  port 24224
+  bind 0.0.0.0
+</source>
+
+<match *.**>
+  @type copy
+  <store>
+    @type elasticsearch
+    host elasticsearch
+    port 9200
+    logstash_format true
+    logstash_prefix fluentd
+    logstash_dateformat %Y%m%d
+    include_tag_key true
+    type_name access_log
+    tag_key @log_name
+    flush_interval 1s
+  </store>
+  <store>
+    @type stdout
+  </store>
+</match>
+EOF
+```
+- Build Fluentd.
+```
+(cd logging/fluentd && docker build -t $USER_NAME/fluentd .)
+```
+- Правим `.env` файл, меняем тэги на `logging` и запускаем приложения.
+```
+cd docker
+docker-compose up -d
+```
+- It works!!!
+http://35.202.57.233:9292/
+- Добавили драйвер логирования fluentd в post.
+```
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
+```
+- Перезапустим все сервисиы.
+- Добавили фильтр в fluentd:
+```
+<filter service.post>
+  @type parser
+  format json
+  key_name log
+</filter>
+```
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
+
+## Неструктруированные логи
+
+- Добавили драйвер логирования fluentd в post.
+```
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
+```
+- Перезапустим ui.
+- Добавили regex фильтр.
+```
+<filter service.ui>
+  @type parser
+  format /\[(?<time>[^\]]*)\]  (?<level>\S+) (?<user>\S+)[\W]*service=(?<service>\S+)[\W]*event=(?<event>\S+)[\W]*(?:path=(?<path>\S+)[\W]*)?request_id=(?<request_id>\S+)[\W]*(?:remote_addr=(?<remote_addr>\S+)[\W]*)?(?:method= (?<method>\S+)[\W]*)?(?:response_status=(?<response_status>\S+)[\W]*)?(?:message='(?<message>[^\']*)[\W]*)?/'
+  key_name log
+</filter>
+```
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
+- Добавили ещё Гроку:
+```
+<filter service.ui>
+  @type parser
+  key_name log
+  format grok
+  grok_pattern %{RUBY_LOGGER}
+</filter>
+
+<filter service.ui>
+  @type parser
+  format grok
+  grok_pattern service=%{WORD:service} \| event=%{WORD:event} \| request_id=%{GREEDYDATA:request_id} \| message='%{GREEDYDATA:message}'
+  key_name message
+  reserve_data true
+</filter>
+```
+- Пересоберём и перезапустим.
+```
+(cd ../logging/fluentd && docker build -t $USER_NAME/fluentd .)
+docker-compose -f docker-compose-logging.yml up -d
+```
+
+## Задание со звездой. Распределённый трейсинг: Zipkin.
+- Добавили сервис zipkin и переменную для включения zipkin в приложениях:
+```
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
+```
+- Перестартуем весь балаган:
+```
+docker-compose -f docker-compose.yml -f docker-compose-logging.yml down
+docker-compose -f docker-compose.yml -f docker-compose-logging.yml up -d
+```
+- Зашли в UI zipkin.
+http://35.202.57.233:9411/zipkin/
+- Посмотрели спаны приложения.

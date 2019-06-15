@@ -1,4 +1,4 @@
-version: "3.3"
+version: "3.0"
 
 volumes:
   reddit-db:
@@ -24,6 +24,8 @@ services:
           - comment_db
     volumes:
       - ./reddit-db:/data/db
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
 
   post:
     image: ${USER_NAME}/post:${POST_VER}
@@ -36,6 +38,13 @@ services:
       reddit:
         aliases:
           - post
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
 
   comment:
     image: ${USER_NAME}/comment:${COMMENT_VER}
@@ -48,6 +57,8 @@ services:
       reddit:
         aliases:
           - comment
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
 
   ui:
     image: ${USER_NAME}/ui:${UI_VER}
@@ -62,3 +73,10 @@ services:
           - ui
     ports:
       - 9292:9292
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
+    environment:
+      - ZIPKIN_ENABLED=${ZIPKIN_ENABLED}
