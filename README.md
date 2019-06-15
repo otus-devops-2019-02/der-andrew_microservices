@@ -1221,7 +1221,7 @@ http://35.202.57.233:9411/zipkin/
 ```
 mkdir -p kubernetes/reddit
 
-cat <<- EOF > post-deployment.yml
+cat <<- EOF > kubernetes/reddit/post-deployment.yml
 ---
 apiVersion: apps/v1beta2
 kind: Deployment
@@ -1239,7 +1239,7 @@ spec:
         app: post
     spec:
       containers:
-      - image: chromko/post
+      - image: avzhalnin/post
         name: post
 EOF
 ```
