@@ -1243,3 +1243,108 @@ spec:
         name: post
 EOF
 ```
+
+## The Hard Way
+- Set a default compute region and zone.
+```
+gcloud config set compute/region us-west1
+gcloud config set compute/zone us-west1-c
+
+gcloud config list
+```
+- The cfssl and cfssljson command line utilities will be used to provision a PKI Infrastructure and generate TLS certificates.
+```
+wget -q --show-progress --https-only --timestamping \
+  https://pkg.cfssl.org/R1.2/cfssl_linux-amd64 \
+  https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+
+chmod +x cfssl_linux-amd64 cfssljson_linux-amd64
+sudo mv cfssl_linux-amd64 /usr/local/bin/cfssl
+sudo mv cfssljson_linux-amd64 /usr/local/bin/cfssljson
+
+cfssl version
+```
+- Install kubectl. The kubectl command line utility is used to interact with the Kubernetes API Server.
+```
+wget https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
+kubectl version --client
+```
+- Create the kubernetes-the-hard-way custom VPC network:
+```
+gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+```
+- A subnet must be provisioned with an IP address range large enough to assign a private IP address to each node in the Kubernetes cluster. Create the kubernetes subnet in the kubernetes-the-hard-way VPC network:
+```
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+```
+- Create a firewall rule that allows internal communication across all protocols:
+```
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-internal \
+  --allow tcp,udp,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 10.240.0.0/24,10.200.0.0/16
+gcloud compute firewall-rules create kubernetes-the-hard-way-allow-external \
+  --allow tcp:22,tcp:6443,icmp \
+  --network kubernetes-the-hard-way \
+  --source-ranges 0.0.0.0/0
+
+gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+```
+- Kubernetes Public IP Address. Allocate a static IP address that will be attached to the external load balancer fronting the Kubernetes API Servers:
+```
+gcloud compute addresses create kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region)
+
+gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
+```
+- Kubernetes Controllers. Create three compute instances which will host the Kubernetes control plane:
+```
+for i in 0 1 2; do
+  gcloud compute instances create controller-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --private-network-ip 10.240.0.1${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,controller
+done
+```
+- Create three compute instances which will host the Kubernetes worker nodes:
+```
+for i in 0 1 2; do
+  gcloud compute instances create worker-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --metadata pod-cidr=10.200.${i}.0/24 \
+    --private-network-ip 10.240.0.2${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,worker
+done
+```
+- List the compute instances in your default compute zone:
+```
+gcloud compute instances list
+```
+- Configuring SSH Access.
+```
+gcloud compute ssh controller-0
+```
+- Provisioning a CA and Generating TLS Certificates.
+- Certificate Authority. Generate the CA configuration file, certificate, and private key:
+```
+
+```
