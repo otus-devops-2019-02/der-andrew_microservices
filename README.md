@@ -2141,4 +2141,6 @@ KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-har
 ```
 curl --cacert ca.pem https://${KUBERNETES_PUBLIC_ADDRESS}:6443/version
 ```
+
+### Bootstrapping the Kubernetes Worker Nodes
 - 
