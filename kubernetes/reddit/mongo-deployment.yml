@@ -15,5 +15,5 @@ spec:
         app: mongo
     spec:
       containers:
-      - image: avzhalnin/mongo
+      - image: mongo
         name: mongo

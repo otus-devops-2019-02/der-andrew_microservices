@@ -2585,3 +2585,24 @@ CONTAINER_ID=$(sudo crictl -r unix:///var/run/containerd/containerd.sock \
 ```
 sudo runsc --root /run/containerd/runsc/k8s.io ps ${CONTAINER_ID}
 ```
+
+## Проверить, что kubectl apply -f <filename> проходит по созданным до этого deployment-ам (ui, post, mongo, comment)
+```
+for pod in comment mongo post ui; do \
+ kubectl apply -f ../reddit/$pod-deployment.yml
+done;
+```
+- ... и поды запускаются
+```
+kubectl get pods
+```
+```
+NAME                                 READY   STATUS    RESTARTS   AGE
+busybox-bd8fb7cbd-x5pjh              1/1     Running   0          38m
+comment-deployment-df84f5596-grs26   1/1     Running   0          12m
+mongo-deployment-6895dffdf4-b7ls6    1/1     Running   0          26s
+nginx-dbddb74b8-5wft6                1/1     Running   0          30m
+post-deployment-b668dc698-s6z29      1/1     Running   0          12m
+ui-deployment-695c9bdb8b-m69z8       1/1     Running   0          12m
+untrusted                            1/1     Running   0          20m
+```
