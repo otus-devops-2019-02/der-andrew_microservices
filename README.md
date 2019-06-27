@@ -1244,7 +1244,9 @@ spec:
 EOF
 ```
 
-## The Hard Way
+## The Hard Way (https://github.com/kelseyhightower/kubernetes-the-hard-way)
+
+### Installing the Client Tools
 - Set a default compute region and zone.
 ```
 gcloud config set compute/region us-west1
@@ -1272,6 +1274,8 @@ sudo mv kubectl /usr/local/bin/
 
 kubectl version --client
 ```
+
+### Provisioning Compute Resources
 - Create the kubernetes-the-hard-way custom VPC network:
 ```
 gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
@@ -1343,7 +1347,8 @@ gcloud compute instances list
 ```
 gcloud compute ssh controller-0
 ```
-- Provisioning a CA and Generating TLS Certificates.
+
+### Provisioning a CA and Generating TLS Certificates.
 - Certificate Authority. Generate the CA configuration file, certificate, and private key:
 ```
 cat > ca-config.json <<EOF
@@ -1607,6 +1612,8 @@ for instance in controller-0 controller-1 controller-2; do
     service-account-key.pem service-account.pem ${instance}:~/
 done
 ```
+
+### Generating Kubernetes Configuration Files for Authentication
 - Kubernetes Public IP Address. Each kubeconfig requires a Kubernetes API Server to connect to. To support high availability the IP address assigned to the external load balancer fronting the Kubernetes API Servers will be used. Retrieve the kubernetes-the-hard-way static IP address:
 ```
 KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
@@ -1734,6 +1741,35 @@ done
 ```
 for instance in controller-0 controller-1 controller-2; do
   gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
+done
+```
+
+### Generating the Data Encryption Config and Key.
+- Kubernetes stores a variety of data including cluster state, application configurations, and secrets. Kubernetes supports the ability to encrypt cluster data at rest.
+- The Encryption Key. Generate an encryption key:
+```
+ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
+```
+- The Encryption Config File. Create the encryption-config.yaml encryption config file:
+```
+cat > encryption-config.yaml <<EOF
+kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: ${ENCRYPTION_KEY}
+      - identity: {}
+EOF
+```
+- Copy the encryption-config.yaml encryption config file to each controller instance:
+```
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp encryption-config.yaml ${instance}:~/
 done
 ```
 - 
