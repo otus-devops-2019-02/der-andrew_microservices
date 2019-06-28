@@ -2784,4 +2784,276 @@ kubectl apply -f post-deployment.yml
 ```
 Connection to 10.0.113.200 5000 port [tcp/*] succeeded!
 ```
+- Обновили mongo-deployment.yml:
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: mongo
+  labels:
+    app: reddit
+    component: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongo
+    spec:
+      containers:
+      - image: mongo:3.2
+        name: mongo
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-persistent-storage
+        emptyDir: {}
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f mongo-deployment.yml
+```
+- Создали сервис comment-service.yml
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: comment
+  labels:
+    app: reddit
+    component: comment
+spec:
+  ports:
+  - port: 9292
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: comment
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f comment-service.yml
+```
+- Проверили `kubectl describe service comment | grep Endpoints`
+```
+Endpoints:         172.17.0.7:9292,172.17.0.8:9292,172.17.0.9:9292
+```
+- Проверили `kubectl exec -it post-76474fb7db-5scm4 nslookup comment`
+```
+Name:      comment
+Address 1: 10.109.118.77 comment.default.svc.cluster.local
+```
+- Создали сервис post-service.yml
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: post
+  labels:
+    app: post
+    component: post
+spec:
+  ports:
+  - port: 5000
+    protocol: TCP
+    targetPort: 5000
+  selector:
+    app: post
+    component: post
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f post-service.yml
+```
+- Проверили `kubectl exec -it ui-797f94946b-5qtt6 nslookup post`
+```
+Name:   post.default.svc.cluster.local
+Address: 10.103.200.32
+```
+- Создали сервис mongodb-service.yml
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  labels:
+    app: reddit
+    component: mongo
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: reddit
+    component: mongo
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f mongodb-service.yml
+```
+- Проверили все сервисы `kubectl get services --show-labels`
+```
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)     AGE     LABELS
+comment      ClusterIP   10.109.118.77    <none>        9292/TCP    50m     app=reddit,component=comment
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP     3h55m   component=apiserver,provider=kubernetes
+mongodb      ClusterIP   10.109.100.136   <none>        27017/TCP   54s     app=reddit,component=mongo
+post         ClusterIP   10.103.200.32    <none>        5000/TCP    5m31s   app=post,component=post
+```
+- Пробрасываем порт `kubectl port-forward --address 0.0.0.0 ui-797f94946b-54stz 9292:9292`
+- Проверяем
+http://10.0.113.200:9292/
+- В логах приложение ищет совсем другой адрес: comment_db, а не mongodb. Аналогично и сервис comment ищет post_db. Эти адреса заданы в их Dockerfile-ах в виде переменных окружения.
+- В Docker Swarm проблема доступа к одному ресурсу под разными именами решалась с помощью сетевых алиасов. В Kubernetes такого функционала нет. Мы эту проблему можем решить с помощью тех же Service-ов.
+- Сделаем Service для БД comment-mongodb-service.yml:
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: comment-db
+  labels:
+    app: reddit
+    component: mongo
+    comment-db: "true"
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: reddit
+    component: mongo
+    comment-db: "true"
+```
+- Так же придется обновить файл deployment для mongodb, чтобы новый Service смог найти нужный POD.
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: mongo
+  labels:
+    app: reddit
+    component: mongo
+    comment-db: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongo
+        comment-db: "true"
+    spec:
+      containers:
+      - image: mongo:3.2
+        name: mongo
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-persistent-storage
+        emptyDir: {}
+```
+- Зададим pod-ам comment переменную окружения для обращения к базе:
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: comment
+  labels:
+    app: reddit
+    component: comment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reddit
+      component: comment
+  template:
+    metadata:
+      name: comment
+      labels:
+        app: reddit
+        component: comment
+    spec:
+      containers:
+      - image: avzhalnin/comment
+        name: comment
+        env:
+        - name: COMMENT_DATABASE_HOST
+          value: comment-db
+```
+- То же для post.
+```
+post-mongodb-service.yml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: post-db
+  labels:
+    app: reddit
+    component: mongo
+    comment-db: "true"
+spec:
+  ports:
+  - port: 27017
+    protocol: TCP
+    targetPort: 27017
+  selector:
+    app: reddit
+    component: mongo
+    comment-db: "true"
+
+post-deployment.yml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: post
+  labels:
+    app: post
+    component: post
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: post
+      component: post
+  template:
+    metadata:
+      name: post
+      labels:
+        app: post
+        component: post
+    spec:
+      containers:
+      - image: avzhalnin/post
+        name: post
+        env:
+        - name: POST_DATABASE_HOST
+          value: post-db
+```
+- Пробросили порты `kubectl port-forward --address 0.0.0.0 ui-797f94946b-2wxx9 9292:9292` и проверили. Всё работает!!!
+http://10.0.113.200:9292/
 - 
