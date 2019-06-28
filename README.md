@@ -2673,4 +2673,40 @@ minikube   Ready    master   105s   v1.15.0
 curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 sudo mv kubectl /usr/local/bin
 ```
+- Обновили ui-deployment.yml:
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: ui
+  labels:
+    app: reddit
+    component: ui
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+  template:
+    metadata:
+      name: ui-pod
+      labels:
+        app: reddit
+        component: ui
+    spec:
+      containers:
+      - image: avzhalnin/ui
+        name: ui
+```
+- Запустим в Minikube ui-компоненту.
+```
+kubectl apply -f ui-deployment.yml
+```
+- Ждём пару минут и проверяем командой `kubectl get deployment`. Должны быть `3`-ки
+```
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+ui     3/3     3            3           98s
+```
 - 
