@@ -2709,4 +2709,79 @@ kubectl apply -f ui-deployment.yml
 NAME   READY   UP-TO-DATE   AVAILABLE   AGE
 ui     3/3     3            3           98s
 ```
+- Найдем, используя selector, POD-ы приложения и пробросим порт.
+```
+kubectl get pods --selector component=ui
+kubectl port-forward --address 0.0.0.0 ui-797f94946b-5qtt6 8080:9292
+```
+- Проверим работу:
+http://10.0.113.200:8080/
+- Обновили comment-deployment.yml:
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: comment
+  labels:
+    app: reddit
+    component: comment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reddit
+      component: comment
+  template:
+    metadata:
+      name: comment
+      labels:
+        app: reddit
+        component: comment
+    spec:
+      containers:
+      - image: avzhalnin/comment
+        name: comment
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f comment-deployment.yml
+```
+- Пробросили порты и проверили.
+http://10.0.113.200:8080/healthcheck
+- Обновили post-deployment.yml:
+```
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: post-deployment
+  labels:
+    app: post
+    component: post
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: post
+      component: post
+  template:
+    metadata:
+      name: post
+      labels:
+        app: post
+        component: post
+    spec:
+      containers:
+      - image: avzhalnin/post
+        name: post
+```
+- Запустим в Minikube компоненту.
+```
+kubectl apply -f post-deployment.yml
+```
+- Пробросили порты и проверили. `nc -v 10.0.113.200 5000`
+```
+Connection to 10.0.113.200 5000 port [tcp/*] succeeded!
+```
 - 
