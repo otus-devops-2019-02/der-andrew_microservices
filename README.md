@@ -2648,3 +2648,29 @@ gcloud -q compute firewall-rules delete \
   gcloud -q compute networks delete kubernetes-the-hard-way
 }
 ```
+
+
+# Kubernetes. Запуск кластера и приложения. Модель безопасности. №26
+
+## Installing minikube.
+- Install Minikube via direct download:
+```
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \
+  && chmod +x minikube
+sudo install minikube /usr/local/bin
+```
+- Запустим наш Minukube-кластер.
+```
+minikube start
+```
+- Проверяем командой `kubectl get nodes`
+```
+NAME       STATUS   ROLES    AGE    VERSION
+minikube   Ready    master   105s   v1.15.0
+```
+- Обновили kubectrl.
+```
+curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+sudo mv kubectl /usr/local/bin
+```
+- 
