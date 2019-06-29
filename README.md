@@ -3647,3 +3647,10 @@ pvc-a9ee6fa2-9a98-11e9-8595-42010a800259   15Gi       RWO            Delete     
 pvc-e28041eb-9a9b-11e9-8595-42010a800259   10Gi       RWO            Delete           Bound       dev/mongo-pvc-dynamic   fast                    3m11s
 reddit-mongo-disk                          25Gi       RWO            Retain           Available                                                   30m
 ```
+
+
+
+
+# CI/CD в Kubernetes №27
+
+## 
