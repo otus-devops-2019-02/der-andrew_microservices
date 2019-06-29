@@ -3264,4 +3264,49 @@ ui     *       35.244.196.102   80      4m5s
 ```
 - Через 1-2 минуты проверяем.
 http://35.244.196.102/
+- Один балансировщик можно спокойно убрать. Обновим сервис для UI.
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  labels:
+    app: reddit
+    component: ui
+spec:
+  type: NodePort
+  ports:
+  - port: 9292
+    nodePort: 32092
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+```
+- Применим `kubectl apply -f ui-service.yml -n dev`
+- Заставим работать Ingress Controller как классический веб. ui-ingress.yml:
+```
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ui
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: ui
+          servicePort: 9292
+```
+- Применяем `kubectl apply -f ui-ingress.yml -n dev`
+- Проверяем через 1-2 минуты:
+http://35.244.196.102/
+
+
+## Secret
+- Защитим наш сервис с помощью TLS.
 - 
