@@ -3056,4 +3056,47 @@ spec:
 ```
 - Пробросили порты `kubectl port-forward --address 0.0.0.0 ui-797f94946b-2wxx9 9292:9292` и проверили. Всё работает!!!
 http://10.0.113.200:9292/
+- Нам нужно как-то обеспечить доступ к ui-сервису снаружи. Для этого нам понадобится Service для UI-компоненты.
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  labels:
+    app: reddit
+    component: ui
+spec:
+  type: NodePort
+  ports:
+  - nodePort: 32092
+    port: 9292
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+```
+- Проверим доступ через адрес виртуалки с minikube.
+```
+minikube service ui
+```
+- Работает!
+http://192.168.99.100:32092/
+- Список сервисов смотрим командой `minikube service list`
+```
+|-------------|----------------------|-----------------------------|
+|  NAMESPACE  |         NAME         |             URL             |
+|-------------|----------------------|-----------------------------|
+| default     | comment              | No node port                |
+| default     | comment-db           | No node port                |
+| default     | kubernetes           | No node port                |
+| default     | mongodb              | No node port                |
+| default     | post                 | No node port                |
+| default     | post-db              | No node port                |
+| default     | ui                   | http://192.168.99.100:32092 |
+| kube-system | kube-dns             | No node port                |
+| kube-system | kubernetes-dashboard | No node port                |
+|-------------|----------------------|-----------------------------|
+```
 - 
