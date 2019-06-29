@@ -3146,3 +3146,63 @@ metadata:
             fieldRef:
               fieldPath: metadata.namespace
 ```
+
+## Разворачиваем Kubernetes
+- Создали кластер:
+```
+gcloud beta container --project "docker-239319" clusters create "standard-cluster-1" \
+  --zone "us-central1-a" --no-enable-basic-auth --cluster-version "1.12.8-gke.10" \
+  --machine-type "n1-standard-1" --image-type "COS" --disk-type "pd-standard" --disk-size "20" \
+  --scopes "https://www.googleapis.com/auth/devstorage.read_only",\
+  "https://www.googleapis.com/auth/logging.write", \
+  "https://www.googleapis.com/auth/monitoring",\
+  "https://www.googleapis.com/auth/servicecontrol",\
+  "https:// www.googleapis.com/auth/service.management.readonly",\
+  "https://www.googleapis.com/auth/trace.append" \
+  --num-nodes "2" --enable-cloud-logging --enable-cloud-monitoring --no-enable-ip-alias \
+  --network "projects/docker-239319/global/networks/default" \
+  --subnetwork "projects/docker-239319/regions/us-central1/subnetworks/default" \
+  --addons HorizontalPodAutoscaling,HttpLoadBalancing --enable-autoupgrade --enable-autorepair
+```
+- Подключимся к кластеру (нажать Connect и скопировать команду).
+```
+gcloud container clusters get-credentials standard-cluster-1 --zone us-central1-a --project docker-239319
+```
+- Проверяем командой `kubectl config current-context`
+- Создадим dev namespace
+```
+kubectl apply -f reddit/dev-namespace.yml
+```
+- Задеплоим всё приложение в namespace dev:
+```
+kubectl apply -n dev -f reddit/
+```
+- Откроем Reddit для внешнего мира:
+```
+gcloud compute --project=docker-239319 firewall-rules create gce-cluster-reddit-app-access \
+  --direction=INGRESS --priority=1000 --network=default --action=ALLOW --rules=tcp:30000-32767 \
+  --source-ranges=0.0.0.0/0
+```
+- Найдите внешний IP-адрес любой ноды из кластера `kubectl get nodes -o wide`
+```
+NAME                                                STATUS   ROLES    AGE   VERSION          INTERNAL-IP   EXTERNAL-IP     OS-IMAGE                             KERNEL-VERSION   CONTAINER-RUNTIME
+gke-standard-cluster-1-default-pool-ab2dcd4c-pksp   Ready    <none>   52m   v1.12.8-gke.10   10.128.0.3    35.238.120.12   Container-Optimized OS from Google   4.14.127+        docker://17.3.2
+gke-standard-cluster-1-default-pool-ab2dcd4c-sz5s   Ready    <none>   52m   v1.12.8-gke.10   10.128.0.4    35.238.22.205   Container-Optimized OS from Google   4.14.127+        docker://17.3.2
+```
+- Найдите порт публикации сервиса ui
+```
+kubectl describe service ui -n dev | grep NodePort
+```
+- Проверяем:
+http://35.238.120.12:32092/
+- В кластере включаем addon dashboadd.
+- Ждём пока кластер загрузится.
+- Даём команду `kubectl proxy`.
+- Заходим по адресу:
+http://localhost:8001/ui
+- Провал, т.к. не хватает прав. 
+- Нужно нашему Service Account назначить роль с достаточными правами на просмотр информации о кластере В кластере уже есть объект ClusterRole с названием cluster-admin. Тот, кому назначена эта роль имеет полный доступ ко всем объектам кластера.
+- Добавим их.
+```
+kubectl create clusterrolebinding kubernetes-dashboard --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
+```
