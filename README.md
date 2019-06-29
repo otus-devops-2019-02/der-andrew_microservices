@@ -3439,4 +3439,94 @@ spec:
 - Монтируем выделенный диск к POD’у mongo `kubectl apply -f mongo-deployment.yml -n dev`.
 - `!!! пересоздания Pod'а (занимает до 10 минут) !!!`
 - После пересоздания mongo, посты сохранены.
+
+
+
+## PersistentVolume
+- Создадим описание PersistentVolume mongo-volume.yml.
+```
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: reddit-mongo-disk
+spec:
+  capacity:
+    storage: 25Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  gcePersistentDisk:
+    fsType: "ext4" 
+    pdName: "reddit-mongo-disk"
+```
+- Добавим PersistentVolume в кластер `kubectl apply -f mongo-volume.yml -n dev`
+- Создадим описание PersistentVolumeClaim (PVC) mongo-claim.yml:
+```
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 15Gi
+```
+- Добавим PersistentVolumeClaim в кластер `kubectl apply -f mongo-claim.yml -n dev`
+- Проверим `kubectl -n dev get pv`
+- Одновременно использовать один PV можно только по одному Claim’у. Если Claim не найдет по заданным параметрам PV внутри кластера, либо тот будет занят другим Claim’ом то он сам создаст нужный ему PV воспользовавшись стандартным StorageClass. `kubectl describe storageclass standard -n dev`
+```
+Name:                  standard
+IsDefaultClass:        Yes
+Annotations:           storageclass.beta.kubernetes.io/is-default-class=true
+Provisioner:           kubernetes.io/gce-pd
+Parameters:            type=pd-standard
+AllowVolumeExpansion:  <unset>
+MountOptions:          <none>
+ReclaimPolicy:         Delete
+VolumeBindingMode:     Immediate
+Events:                <none>
+```
+- Подключим PVC к нашим Pod'ам.
+```
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: mongo
+  labels:
+    app: reddit
+    component: mongo
+    post-db: "true"
+    comment-db: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongo
+        post-db: "true"
+        comment-db: "true"
+    spec:
+      containers:
+      - image: mongo:3.2
+        name: mongo
+        volumeMounts:
+        - name: mongo-gce-pd-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-gce-pd-storage
+        persistentVolumeClaim:
+          claimName: mongo-pvc
+```
+- Обновим описание нашего Deployment’а `kubectl apply -f mongo-deployment.yml -n dev`
 - 
