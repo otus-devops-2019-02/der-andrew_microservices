@@ -3099,4 +3099,50 @@ http://192.168.99.100:32092/
 | kube-system | kubernetes-dashboard | No node port                |
 |-------------|----------------------|-----------------------------|
 ```
-- 
+- Список расширений minikube `minikube addons list`
+```
+- addon-manager: enabled
+- dashboard: enabled
+- default-storageclass: enabled
+- efk: disabled
+- freshpod: disabled
+- gvisor: disabled
+- heapster: disabled
+- ingress: disabled
+- logviewer: disabled
+- metrics-server: disabled
+- nvidia-driver-installer: disabled
+- nvidia-gpu-device-plugin: disabled
+- registry: disabled
+- registry-creds: disabled
+- storage-provisioner: enabled
+- storage-provisioner-gluster: disabled
+```
+- Объекты нашего dashboard `kubectl get all -n kube-system --selector app=kubernetes-dashboard`
+```
+NAME                                        READY   STATUS    RESTARTS   AGE
+pod/kubernetes-dashboard-7b8ddcb5d6-5qtp8   1/1     Running   0          59m
+NAME                           TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes-dashboard   ClusterIP   10.108.116.238   <none>        80/TCP    59m
+NAME                                              DESIRED   CURRENT   READY   AGE
+replicaset.apps/kubernetes-dashboard-7b8ddcb5d6   1         1         1       59m
+```
+- Зайдем в Dashboard `minikube service kubernetes-dashboard -n kube-system`
+
+## Namespace
+- Создадим свой.
+```
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+```
+- Добавим инфу об окружении внутрь контейнера UI
+```
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+```
