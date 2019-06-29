@@ -3529,4 +3529,82 @@ spec:
           claimName: mongo-pvc
 ```
 - Обновим описание нашего Deployment’а `kubectl apply -f mongo-deployment.yml -n dev`
-- 
+
+
+## Динамическое выделение Volume'ов
+- Но гораздо интереснее создавать хранилища при необходимости и в автоматическом режиме. В этом нам помогут StorageClass’ы. Они описывают где (какой провайдер) и какие хранилища создаются.
+- Создадим описание StorageClass’а storage-fast.yml:
+```
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: fast
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+```
+- Добавим StorageClass в кластер `kubectl apply -f storage-fast.yml -n dev`
+- Проверим `kubectl -n dev get sc`
+- PVC + StorageClass. Создадим описание PersistentVolumeClaim. mongo-claim-dynamic.yml:
+```
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mongo-pvc-dynamic
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast
+  resources:
+    requests:
+      storage: 10Gi
+```
+- Добавим StorageClass в кластер `kubectl apply -f mongo-claim-dynamic.yml -n dev`
+- Подключим PVC к нашим Pod'ам mongo-deployment.yml:
+```
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: mongo
+  labels:
+    app: reddit
+    component: mongo
+    post-db: "true"
+    comment-db: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongo
+        post-db: "true"
+        comment-db: "true"
+    spec:
+      containers:
+      - image: mongo:3.2
+        name: mongo
+        volumeMounts:
+        - name: mongo-gce-pd-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-gce-pd-storage
+        persistentVolumeClaim:
+          claimName: mongo-pvc-dynamic
+```
+- Обновим описание нашего Deployment'а `kubectl apply -f mongo-deployment.yml -n dev`
+- Проверяем `kubectl -n dev get pv`
+```
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                   STORAGECLASS   REASON   AGE
+pvc-a9ee6fa2-9a98-11e9-8595-42010a800259   15Gi       RWO            Delete           Bound       dev/mongo-pvc           standard                26m
+pvc-e28041eb-9a9b-11e9-8595-42010a800259   10Gi       RWO            Delete           Bound       dev/mongo-pvc-dynamic   fast                    3m11s
+reddit-mongo-disk                          25Gi       RWO            Retain           Available                                                   30m
+```
