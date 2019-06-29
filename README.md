@@ -3351,6 +3351,45 @@ https://35.244.196.102/
 
 
 
+## Network Policy
+- Найдите имя кластера `gcloud beta container clusters list`
+```
+NAME                LOCATION       MASTER_VERSION  MASTER_IP      MACHINE_TYPE   NODE_VERSION   NUM_NODES  STATUS
+standard-cluster-1  us-central1-a  1.12.8-gke.10   35.184.48.221  n1-standard-1  1.12.8-gke.10  2          RUNNING
+```
+- Включим network-policy для GKE.
+```
+gcloud beta container clusters update standard-cluster-1 --zone=us-central1-a --update-addons=NetworkPolicy=ENABLED
+gcloud beta container clusters update standard-cluster-1 --zone=us-central1-a  --enable-network-policy
+```
+- mongo-network-policy.yml:
+```
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-db-traffic
+  labels:
+    app: reddit
+spec:
+  podSelector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: reddit
+          component: comment
+```
+- Применяем политику `kubectl apply -f mongo-network-policy.yml -n dev`
+- Проверяем `kubectl -n dev get networkpolicy`
+- 
+
+
 ## Хранилище для базы
 - Обновим mongo-deployment.yml:
 ```
