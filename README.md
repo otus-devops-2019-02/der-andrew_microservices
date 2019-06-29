@@ -3206,3 +3206,62 @@ http://localhost:8001/ui
 ```
 kubectl create clusterrolebinding kubernetes-dashboard --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
 ```
+
+
+# Kubernetes. Networks ,Storages. Задание №27
+
+## Load balancer.
+- Настроим соответствующим образом Service UI:
+```
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  labels:
+    app: reddit
+    component: ui
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    nodePort: 32092
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+```
+- Применяем изменения `kubectl apply -f ui-service.yml -n dev`
+- Преверяем `kubectl get service -n dev --selector component=ui`
+```
+NAME   TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)        AGE
+ui     LoadBalancer   10.11.252.109   35.202.189.62   80:32092/TCP   135m
+```
+- Работает!
+http://35.202.189.62/
+
+## Ingress
+- Google в GKE уже предоставляет возможность использовать их собственные решения балансирощик в качестве Ingress controller-ов. Перейдите в настройки кластера раздел Дополнения(add-ons) в веб-консоли gcloud. Убедитесь, что встроенный Ingress включен.
+- Создадим Ingress для сервиса UI.
+```
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ui
+spec:
+  backend:
+    serviceName: ui
+    servicePort: 80
+```
+- Применим `kubectl apply -f ui-ingress.yml -n dev`.
+- В gke балансировщиках нагрузки появились несколько правил.
+- Преоврим в кластере ` kubectl get ingress -n dev`
+```
+NAME   HOSTS   ADDRESS          PORTS   AGE
+ui     *       35.244.196.102   80      4m5s
+```
+- Через 1-2 минуты проверяем.
+http://35.244.196.102/
+- 
