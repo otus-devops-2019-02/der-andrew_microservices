@@ -3329,4 +3329,22 @@ Data
 tls.crt:  1127 bytes
 tls.key:  1704 bytes
 ```
-- 
+- TLS Termination. Настроим Ingress на прием только HTTPS траффика. ui-ingress.yml:
+```
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: ui
+  annotations:
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  tls:
+  - secretName: ui-ingress
+  backend:
+    serviceName: ui
+    servicePort: 9292
+```
+- Применим `kubectl apply -f ui-ingress.yml -n dev`.
+- Проверим, подождав 1-2 минуты:
+https://35.244.196.102/
