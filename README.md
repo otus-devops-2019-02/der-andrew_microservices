@@ -3389,4 +3389,54 @@ spec:
       - name: mongo-persistent-storage
         emptyDir: {}
 ```
+- Применили `kubectl apply -f mongo-deployment.yml -n dev`
+- Создадим диск в Google Cloud.
+```
+gcloud compute disks create --size=25GB --zone=us-central1-a reddit-mongo-disk
+```
+- Добавим новый Volume POD-у базы.
+```
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: mongo
+  labels:
+    app: reddit
+    component: mongo
+    post-db: "true"
+    comment-db: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongo
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongo
+        post-db: "true"
+        comment-db: "true"
+    spec:
+      containers:
+      - image: mongo:3.2
+        name: mongo
+        volumeMounts:
+        - name: mongo-gce-pd-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-persistent-storage
+        emptyDir: {}
+        volumes:
+      - name: mongo-gce-pd-storage
+        gcePersistentDisk:
+          pdName: reddit-mongo-disk
+          fsType: ext4
+```
+- Монтируем выделенный диск к POD’у mongo `kubectl apply -f mongo-deployment.yml -n dev`.
+- `!!! пересоздания Pod'а (занимает до 10 минут) !!!`
+- После пересоздания mongo, посты сохранены.
 - 
