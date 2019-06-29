@@ -3309,4 +3309,24 @@ http://35.244.196.102/
 
 ## Secret
 - Защитим наш сервис с помощью TLS.
+- Подготовим сертификат используя IP как CN.
+```
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=35.244.196.102"
+```
+- Загрузит сертификат в кластер kubernetes.
+```
+kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev
+```
+- Проверить можно командой `kubectl describe secret ui-ingress -n dev`.
+```
+Name:         ui-ingress
+Namespace:    dev
+Labels:       <none>
+Annotations:  <none>
+Type:  kubernetes.io/tls
+Data
+====
+tls.crt:  1127 bytes
+tls.key:  1704 bytes
+```
 - 
