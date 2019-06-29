@@ -4,7 +4,7 @@ kind: Service
 metadata:
   name: post
   labels:
-    app: post
+    app: reddit
     component: post
 spec:
   ports:
@@ -12,5 +12,5 @@ spec:
     protocol: TCP
     targetPort: 5000
   selector:
-    app: post
+    app: reddit
     component: post
