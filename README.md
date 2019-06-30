@@ -3661,4 +3661,36 @@ tar -xzf helm-v2.14.1-linux-amd64.tar.gz linux-amd64/helm
 sudo mv linux-amd64/helm /usr/local/bin
 rm -dfr linux-amd64 helm-v2.14.1-linux-amd64.tar.gz
 ```
+- Install Tiller.
+```
+cat << EOF > tiller.yml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: tiller
+    namespace: kube-system
+EOF
+
+kubectl apply -f tiller.yml
+```
+- Запустим tiller-сервер `helm init --service-account tiller`.
+- Проверим `kubectl get pods -n kube-system --selector app=helm`.
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+tiller-deploy-7b659b7fbd-xnn62   1/1     Running   0          74s
+```
 - 
