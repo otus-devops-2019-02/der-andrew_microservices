@@ -25,10 +25,10 @@ spec:
         release: {{ .Release.Name }}
     spec:
       containers:
-      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      - image: chromko/ui
         name: ui
         ports:
-        - containerPort: {{ .Values.service.internalPort }}
+        - containerPort: 9292
           name: ui
           protocol: TCP
         env:

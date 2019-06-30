@@ -1,0 +1,7 @@
+name: post
+version: 1.0.0
+description: OTUS reddit application POST
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0

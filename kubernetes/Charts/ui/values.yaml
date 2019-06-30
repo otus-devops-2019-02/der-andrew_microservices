@@ -4,5 +4,5 @@ service:
   externalPort: 9292
 
 image:
-  repository: avzhalnin
+  repository: avzhalnin/ui
   tag: latest

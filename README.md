@@ -3866,7 +3866,7 @@ spec:
         release: {{ .Release.Name }}
     spec:
       containers:
-      - image: "{{ .Values.image.repository }}/ui:{{ .Values.image.tag }}"
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         name: ui
         ports:
         - containerPort: {{ .Values.service.internalPort }}
@@ -3927,6 +3927,7 @@ helm upgrade ui-3 ui/
 ```
 - Осталось собрать пакеты для остальных компонент.
 ```
+mkdir post/templates
 cat << EOF > post/templates/service.yaml
 ---
 apiVersion: apps/v1beta1
@@ -3966,6 +3967,58 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+EOF
+
+
+cat << EOF > post/templates/deployment.yaml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: post
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: post
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: post
+      labels:
+        app: reddit
+        component: post
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: post
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: post
+          protocol: TCP
+        env:
+        - name: POST_DATABASE_HOST
+          value: {{ .Values.databaseHost | default (printf "%s-mongodb" .Release.Name) }}
+EOF
+
+
+cat << EOF > post/values.yaml
+---
+service:
+  internalPort: 5000
+  externalPort: 5000
+
+image:
+  repository: chromko/post
+  tag: latest
+
+databaseHost:
 EOF
 ```
 - 
