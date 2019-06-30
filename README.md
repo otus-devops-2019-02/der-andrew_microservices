@@ -3835,4 +3835,94 @@ helm install ui --name ui-1
 helm install ui --name ui-2
 helm install ui --name ui-3
 ```
+- Должны появиться 3 ingress'а `kubectl get ingress`
+- Кастомизируем установку своими переменными (образ и порт).
+```
+cat << EOF > ui/templates/deployment.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: {{ .Values.image.repository }}/ui:{{ .Values.image.tag }}
+        name: ui
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: ui
+          protocol: TCP
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+
+cat << EOF > ui/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+EOF
+
+cat << EOF > ui/templates/ingress.yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: {{ .Release.Name }}-{{ .Chart.Name }}
+          servicePort: {{ .Values.service.externalPort }}
+EOF
+```
+- Обновим чарты.
+```
+helm upgrade ui-1 ui/
+helm upgrade ui-2 ui/
+helm upgrade ui-3 ui/
+```
 - 
