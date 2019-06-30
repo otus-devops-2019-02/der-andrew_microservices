@@ -3653,4 +3653,12 @@ reddit-mongo-disk                          25Gi       RWO            Retain     
 
 # CI/CD в Kubernetes №27
 
-## 
+## Helm
+- Install Helm.
+```
+wget 'https://get.helm.sh/helm-v2.14.1-linux-amd64.tar.gz'
+tar -xzf helm-v2.14.1-linux-amd64.tar.gz linux-amd64/helm
+sudo mv linux-amd64/helm /usr/local/bin
+rm -dfr linux-amd64 helm-v2.14.1-linux-amd64.tar.gz
+```
+- 
