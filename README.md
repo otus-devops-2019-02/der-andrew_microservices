@@ -3732,4 +3732,107 @@ for f in deployment ingress service; do git mv ../reddit/ui-$f.yml ui/templates/
 helm install --name test-ui-1 ui/
 ```
 - Проверяем `helm ls`
-- Шаблонизируем chart.
+- Шаблонизируем chart-ы.
+```
+cat << EOF > ui/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+EOF
+
+cat << EOF > ui/templates/deployment.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: avzhalnin/ui
+        name: ui
+        ports:
+        - containerPort: 9292
+          name: ui
+          protocol: TCP
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+
+
+cat << EOF > ui/templates/ingress.yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: {{ .Release.Name }}-{{ .Chart.Name }}
+          servicePort: 9292
+EOF
+```
+- Определим значения собственных переменных 
+```
+cat << EOF > ui/values.yaml
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: avzhalnin/ui
+  tag: latest
+EOF
+```
+- Установим несколько релизов
+```
+helm install ui --name ui-1
+helm install ui --name ui-2
+helm install ui --name ui-3
+```
+- 
