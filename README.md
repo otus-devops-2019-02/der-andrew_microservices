@@ -3693,4 +3693,43 @@ kubectl apply -f tiller.yml
 NAME                             READY   STATUS    RESTARTS   AGE
 tiller-deploy-7b659b7fbd-xnn62   1/1     Running   0          74s
 ```
-- 
+
+## Charts
+- Создайте директорию Charts в папке kubernetes со следующей структурой директорий:
+```
+kubernetes
+  ├──Charts
+     ├── comment
+     ├── post
+     ├── reddit
+     └── ui
+mkdir Charts
+cd Charts
+for d in comment post reddit ui; do mkdir $d;done
+cd ..
+tree Charts
+```
+- Создание чарта для ui.
+```
+cd Charts
+cat << EOF > ui/Chart.yaml
+name: ui
+version: 1.0.0
+description: OTUS reddit application UI
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+```
+- Создание шаблонов для ui.
+```
+mkdir ui/templates
+for f in deployment ingress service; do git mv ../reddit/ui-$f.yml ui/templates/$f.yaml;done
+```
+- Установим Chart.
+```
+helm install --name test-ui-1 ui/
+```
+- Проверяем `helm ls`
+- Шаблонизируем chart.
