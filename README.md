@@ -3928,6 +3928,18 @@ helm upgrade ui-3 ui/
 - Осталось собрать пакеты для остальных компонент.
 ```
 mkdir post/templates
+
+cat << EOF > post/Chart.yaml
+name: post
+version: 1.0.0
+description: OTUS reddit application POST
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+
+
 cat << EOF > post/templates/service.yaml
 ---
 apiVersion: apps/v1beta1
@@ -4015,10 +4027,145 @@ service:
   externalPort: 5000
 
 image:
-  repository: chromko/post
+  repository: avzhalnin/post
+  tag: latest
+
+databaseHost:
+EOF
+
+
+
+mkdir comment/templates
+
+cat << EOF > comment/Chart.yaml
+name: comment
+version: 1.0.0
+description: OTUS reddit application COMMENT
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+
+
+cat << EOF > comment/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+EOF
+
+
+cat << EOF > comment/templates/deployment.yaml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: comment
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: comment
+      labels:
+        app: reddit
+        component: comment
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: comment
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: comment
+          protocol: TCP
+        env:
+        - name: COMMENT_DATABASE_HOST
+          value: {{ .Values.databaseHost | default (printf "%s-mongodb" .Release.Name) }}
+EOF
+
+
+
+cat << EOF > comment/values.yaml
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: avzhalnin/comment
   tag: latest
 
 databaseHost:
 EOF
 ```
-- 
+- Helper for comment.
+```
+cat << EOF > comment/templates/_helpers.tpl
+{{- define "comment.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+```
+- Use helper.
+```
+cat << EOF > comment/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "comment.fullname" . }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+EOF
+```
+- Helper for post and ui.
+```
+cat << EOF > post/templates/_helpers.tpl
+{{- define "post.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+
+cat << EOF > ui/templates/_helpers.tpl
+{{- define "ui.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+```

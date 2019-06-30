@@ -1,38 +1,19 @@
 ---
-apiVersion: apps/v1beta1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
   name: {{ .Release.Name }}-{{ .Chart.Name }}
   labels:
     app: reddit
-    component: ui
+    component: post
     release: {{ .Release.Name }}
 spec:
-  replicas: 3
-  strategy:
-    type: Recreate
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
   selector:
-    matchLabels:
-      app: reddit
-      component: ui
-      release: {{ .Release.Name }}
-  template:
-    metadata:
-      name: ui
-      labels:
-        app: reddit
-        component: ui
-        release: {{ .Release.Name }}
-    spec:
-      containers:
-      - image: chromko/ui
-        name: ui
-        ports:
-        - containerPort: 9292
-          name: ui
-          protocol: TCP
-        env:
-        - name: ENV
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+    app: reddit
+    component: post
+    release: {{ .Release.Name }}
