@@ -4150,3 +4150,152 @@ cat << EOF > ui/templates/_helpers.tpl
 {{- end -}}
 EOF
 ```
+
+
+## Управление зависимостями
+- Создайте reddit/Chart.yaml
+```
+cat << EOF > reddit/Chart.yaml
+name: reddit
+version: 1.0.0
+description: OTUS simple reddit application
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+```
+- Создайте пустой reddit/values.yaml
+```
+touch reddit/values.yaml
+```
+- В директории Chart'а reddit создадим
+```
+cat << EOF > reddit/requirements.yaml
+dependencies:
+  - name: ui
+    version: "1.0.0"
+    repository: "file://../ui"
+  - name: post
+    version: 1.0.0
+    repository: file://../post
+  - name: comment
+    version: 1.0.0
+    repository: file://../comment
+EOF
+```
+- Нужно загрузить зависимости (когда Chart’ не упакован в tgz архив)
+```
+helm dep update
+```
+- Chart для базы данных не будем создавать вручную. Возьмем готовый.
+- Найдем Chart в общедоступном репозитории `helm search mongo`
+- Обновим зависимости.
+```
+cat << EOF > reddit/requirements.yaml
+dependencies:
+  - name: ui
+    version: "1.0.0"
+    repository: "file://../ui"
+  - name: post
+    version: 1.0.0
+    repository: file://../post
+  - name: comment
+    version: 1.0.0
+    repository: file://../comment
+  - name: mongodb
+    version: 0.4.18
+    repository: https://kubernetes-charts.storage.googleapis.com
+EOF
+```
+- Выгрузим зависимости `helm dep update`
+- Установим наше приложение:
+```
+cd ..
+helm install reddit --name reddit-test
+```
+- Есть проблема с тем, что UI-сервис не знает как правильно ходить в post и comment сервисы. Ведь их имена теперь динамические и зависят от имен чартов В Dockerfile UI-сервиса уже заданы переменные окружения. Надо, чтобы они указывали на нужные бекенды.
+- Добавим в ui/deployments.yaml
+```
+cat << EOF > ui/deployments.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: ui
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: ui
+          protocol: TCP
+        env:
+        - name: POST_SERVICE_HOST
+          value: {{ .Values.postHost | default (printf "%s-post" .Release.Name) }}
+        - name: POST_SERVICE_PORT
+          value: {{ .Values.postPort | default "5000" | quote }}
+        - name: COMMENT_SERVICE_HOST
+          value: {{ .Values.commentHost | default (printf "%s-comment".Release.Name) }}
+        - name: COMMENT_SERVICE_PORT
+          value: {{ .Values.commentPort | default "9292" | quote }}
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+```
+- Создадим reddit/values.yaml
+```
+cat << EOF > reddit/values.yaml
+comment:
+  image:
+    repository: avzhalnin/comment
+    tag: latest
+  service:
+    externalPort: 9292
+
+post:
+  image:
+    repository: avzhalnin/post
+    tag: latest
+    service:
+      externalPort: 5000
+
+ui:
+  image:
+    repository: avzhalnin/ui
+    tag: latest
+    service:
+      externalPort: 9292
+EOF
+```
+- После обновления UI - нужно обновить зависимости чарта reddit. `helm dep update ./reddit`
+- Обновите релиз, установленный в k8s `helm upgrade reddit-test ./reddit`
+- Проверяем
+http://35.244.135.236/
+
+
+## GitLab+Kubernetes
+- 
