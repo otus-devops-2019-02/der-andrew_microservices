@@ -3866,7 +3866,7 @@ spec:
         release: {{ .Release.Name }}
     spec:
       containers:
-      - image: {{ .Values.image.repository }}/ui:{{ .Values.image.tag }}
+      - image: "{{ .Values.image.repository }}/ui:{{ .Values.image.tag }}"
         name: ui
         ports:
         - containerPort: {{ .Values.service.internalPort }}
@@ -3924,5 +3924,48 @@ EOF
 helm upgrade ui-1 ui/
 helm upgrade ui-2 ui/
 helm upgrade ui-3 ui/
+```
+- Осталось собрать пакеты для остальных компонент.
+```
+cat << EOF > post/templates/service.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: chromko/ui
+        name: ui
+        ports:
+        - containerPort: 9292
+          name: ui
+          protocol: TCP
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
 ```
 - 
