@@ -4298,4 +4298,161 @@ http://35.244.135.236/
 
 
 ## GitLab+Kubernetes
+- Добавили bigpool в кластер с более мощнной виртуалкой.
+- Отключите RBAC (в настройках кластера - Устаревшие права доступа Legacy Authorization) для упрощения работы. Gitlab-Omnibus пока не подготовлен для этого, а самим это в рамках аботы смысла делать нет.
+
+## Установим GitLab
+- Добавим репозиторий Gitlab `helm repo add gitlab https://charts.gitlab.io`.
+- Мы будем менять конфигурацию Gitlab, поэтому скачаем Chart.
+```
+helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untar
+cd gitlab-omnibus
+```
+- Поправьте gitlab-omnibus/values.yaml
+```
+baseDomain: example.com
+legoEmail: you@example.com
+```
+- Поправить gitlab-omnibus/templates/gitlab/gitlab-svc.yaml 
+```
+cat << EOF > templates/gitlab/gitlab-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  selector:
+    name: {{ template "fullname" . }}
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: ssh
+    - name: mattermost
+      port: 8065
+      targetPort: mattermost
+    - name: registry
+      port: 8105
+      targetPort: registry
+    - name: workhorse
+      port: 8005
+      targetPort: workhorse
+    - name: prometheus
+      port: 9090
+      targetPort: prometheus
+    - name: web
+      port: 80
+      targetPort: workhorse
+EOF
+```
+- Поправить в gitlab-omnibus/templates/gitlab-config.yaml
+```
+cat << EOF > templates/gitlab-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}-config
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  external_scheme: http
+  external_hostname: {{ template "fullname" . }}
+  registry_external_scheme: https
+  registry_external_hostname: registry.{{ .Values.baseDomain }}
+  mattermost_external_scheme: https
+  mattermost_external_hostname: mattermost.{{ .Values.baseDomain }}
+  mattermost_app_uid: {{ .Values.mattermostAppUID }}
+  postgres_user: gitlab
+  postgres_db: gitlab_production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "fullname" . }}-secrets
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  postgres_password: {{ .Values.postgresPassword }}
+  initial_shared_runners_registration_token: {{ default "" .Values.initialSharedRunnersRegistrationToken | b64enc | quote }}
+  mattermost_app_secret: {{ .Values.mattermostAppSecret | b64enc | quote }}
+{{- if .Values.gitlabEELicense }}
+  gitlab_ee_license: {{ .Values.gitlabEELicense | b64enc | quote }}
+{{- end }}
+EOF
+```
+- Поправить в `gitlab-omnibus/templates/ingress/gitlab-ingress.yaml`
+```
+cat << EOF > templates/ingress/gitlab-ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  tls:
+  - hosts:
+    - gitlab.{{ .Values.baseDomain }}
+    - registry.{{ .Values.baseDomain }}
+    - mattermost.{{ .Values.baseDomain }}
+    - prometheus.{{ .Values.baseDomain }}
+    secretName: gitlab-tls
+  rules:
+  - host: {{ template "fullname" . }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8005
+  - host: registry.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8105
+  - host: mattermost.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8065
+  - host: prometheus.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 9090
+---
+EOF
+```
+- Установим Gitlab `helm install --name gitlab . -f values.yaml`.
+- Должно пройти несколько минут. Найдите выданный IP-адрес ingress-контроллера nginx. `kubectl get service -n nginx-ingress nginx`
+```
+NAME    TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)                                   AGE
+nginx   LoadBalancer   10.11.253.79   35.238.203.247   80:31428/TCP,443:31374/TCP,22:30531/TCP   2m53s
+```
+- Поместите запись в локальный файл /etc/hosts (поставьте свой IP-адрес):
+```
+sudo sh -c 'echo "35.238.203.247 gitlab-gitlab staging production" >> /etc/hosts'
+```
 - 
