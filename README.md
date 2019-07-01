@@ -4555,4 +4555,36 @@ sudo sh -c 'echo "35.238.203.247 gitlab-gitlab staging production" >> /etc/hosts
 - Запустить
 http://gitlab-gitlab/
 - Создать группу и проекты.
+- В директории Gitlab_ci/ui:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/ui.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/comment:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/comment.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/post:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/post.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/reddit-deploy:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/reddit-deploy.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
 - 
