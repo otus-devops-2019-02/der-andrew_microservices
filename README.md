@@ -4298,7 +4298,7 @@ http://35.244.135.236/
 
 
 ## GitLab+Kubernetes
-- Добавили bigpool в кластер с более мощнной виртуалкой.
+- Добавили bigpool в кластер с более мощной виртуалкой.
 - Отключите RBAC (в настройках кластера - Устаревшие права доступа Legacy Authorization) для упрощения работы. Gitlab-Omnibus пока не подготовлен для этого, а самим это в рамках аботы смысла делать нет.
 
 ## Установим GitLab
@@ -4587,4 +4587,327 @@ git add .
 git commit -am 'Init'
 git push origin master
 ```
-- 
+- Для ui добавим 
+```
+cat << EOF > .gitlab-ci.yml
+image: alpine:latest
+
+stages:
+  - build
+  - test
+  - review
+  - release
+
+build:
+  stage: build
+  image: docker:git
+  services:
+    - docker:dind
+  script:
+    - setup_docker
+    - build
+  variables:
+    DOCKER_DRIVER: overlay2
+  only:
+    - branches
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - branches
+
+release:
+  stage: release
+  image: docker
+  services:
+    - docker:dind
+  script:
+    - setup_docker
+    - release
+  only:
+    - master
+
+review:
+  stage: review
+  script:
+    - install_dependencies
+    - ensure_namespace
+    - install_tiller
+    - deploy
+  variables:
+    KUBE_NAMESPACE: review
+    host: \$CI_PROJECT_PATH_SLUG-\$CI_COMMIT_REF_SLUG
+  environment:
+    name: review/\$CI_PROJECT_PATH/\$CI_COMMIT_REF_NAME
+    url: http://\$CI_PROJECT_PATH_SLUG-\$CI_COMMIT_REF_SLUG
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
+
+.auto_devops: &auto_devops |
+  [[ "\$TRACE" ]] && set -x
+  export CI_REGISTRY="index.docker.io"
+  export CI_APPLICATION_REPOSITORY=\$CI_REGISTRY/\$CI_PROJECT_PATH
+  export CI_APPLICATION_TAG=\$CI_COMMIT_REF_SLUG
+  export CI_CONTAINER_NAME=ci_job_build_\${CI_JOB_ID}
+  export TILLER_NAMESPACE="kube-system"
+
+  function deploy() {
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+
+    if [[ "\$track" != "stable" ]]; then
+      name="\$name-\$track"
+    fi
+
+    echo "Clone deploy repository..."
+    git clone http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/reddit-deploy.git
+
+    echo "Download helm dependencies..."
+    helm dep update reddit-deploy/reddit
+
+    echo "Deploy helm release \$name to \$KUBE_NAMESPACE"
+    helm upgrade --install \
+      --wait \
+      --set ui.ingress.host="\$host" \
+      --set \$CI_PROJECT_NAME.image.tag=\$CI_APPLICATION_TAG \
+      --namespace="\$KUBE_NAMESPACE" \
+      --version="\$CI_PIPELINE_ID-\$CI_JOB_ID" \
+      "\$name" \
+      reddit-deploy/reddit/
+  }
+
+  function install_dependencies() {
+
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://storage.googleapis.com/pub/gsutil.tar.gz | tar -xz -C \$HOME
+    export PATH=\${PATH}:\$HOME/gsutil
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.9.1-linux-amd64.tar.gz | tar zx
+
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl  -o /usr/bin/sync-repo.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/sync-repo.sh
+    chmod a+x /usr/bin/sync-repo.sh
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  }
+
+  function setup_docker() {
+    if ! docker info &>/dev/null; then
+      if [ -z "\$DOCKER_HOST" -a "\$KUBERNETES_PORT" ]; then
+        export DOCKER_HOST='tcp://localhost:2375'
+      fi
+    fi
+  }
+
+  function ensure_namespace() {
+    kubectl describe namespace "\$KUBE_NAMESPACE" || kubectl create namespace "\$KUBE_NAMESPACE"
+  }
+
+  function release() {
+
+    echo "Updating docker images ..."
+
+    if [[ -n "\$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "\$CI_REGISTRY_USER" -p "\$CI_REGISTRY_PASSWORD"
+      echo ""
+    fi
+
+    docker pull "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG"
+    docker tag "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG" "\$CI_APPLICATION_REPOSITORY:\$(cat VERSION)"
+    docker push "\$CI_APPLICATION_REPOSITORY:\$(cat VERSION)"
+    echo ""
+  }
+
+  function build() {
+
+    echo "Building Dockerfile-based application..."
+    echo `git show --format="%h" HEAD | head -1` > build_info.txt
+    echo `git rev-parse --abbrev-ref HEAD` >> build_info.txt
+    docker build -t "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG" .
+
+    if [[ -n "\$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "\$CI_REGISTRY_USER" -p "\$CI_REGISTRY_PASSWORD"
+      echo ""
+    fi
+
+    echo "Pushing to GitLab Container Registry..."
+    docker push "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG"
+    echo ""
+  }
+
+  function install_tiller() {
+    echo "Checking Tiller..."
+    helm init --upgrade
+    kubectl rollout status -n "\$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    if ! helm version --debug; then
+      echo "Failed to init Tiller."
+      return 1
+    fi
+    echo ""
+  }
+
+before_script:
+  - *auto_devops
+EOF
+```
+- После деплоя появилась ветка в кубере!
+```
+ helm ls
+NAME                    REVISION        UPDATED                         STATUS          CHART                   APP VERSION     NAMESPACE
+gitlab                  1               Mon Jul  1 16:51:22 2019        DEPLOYED        gitlab-omnibus-0.1.37                   default
+review-avzhalnin-2lvl84 1               Mon Jul  1 20:50:54 2019        DEPLOYED        reddit-1.0.0            1               review
+```
+- Насмотревшись, удалим руками через gitlab. `helm ls`
+```NAME                    REVISION        UPDATED                         STATUS          CHART                   APP VERSION     NAMESPACE
+gitlab                  1               Mon Jul  1 16:51:22 2019        DEPLOYED        gitlab-omnibus-0.1.37                   default
+review-avzhalnin-0g3bjj 1               Mon Jul  1 21:03:11 2019        DEPLOYED        reddit-1.0.0            1               review
+review-avzhalnin-mb4aj8 1               Mon Jul  1 21:03:11 2019        DEPLOYED        reddit-1.0.0            1               review
+```
+- То же самое проделали с comment и post.
+- Теперь создадим staging и production среды для работы приложения. Создайте файл reddit-deploy/.gitlab-ci.yml
+- Этот файл отличается от предыдущих тем, что:
+1. Не собирает docker-образы
+2. Деплоит на статичные окружения (staging и production)
+3. Не удаляет окружения
+```
+cat << EOF > .gitlab-ci.yml
+image: alpine:latest
+
+stages:
+  - test
+  - staging
+  - production
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - triggers
+    - branches
+
+staging:
+  stage: staging
+  script:
+  - install_dependencies
+  - ensure_namespace
+  - install_tiller
+  - deploy
+  variables:
+    KUBE_NAMESPACE: staging
+  environment:
+    name: staging
+    url: http://staging
+  only:
+    refs:
+      - master
+    kubernetes: active
+
+production:
+  stage: production
+  script:
+    - install_dependencies
+    - ensure_namespace
+    - install_tiller
+    - deploy
+  variables:
+    KUBE_NAMESPACE: production
+  environment:
+    name: production
+    url: http://production
+  when: manual
+  only:
+    refs:
+      - master
+    kubernetes: active
+
+.auto_devops: &auto_devops |
+  # Auto DevOps variables and functions
+  [[ "\$TRACE" ]] && set -x
+  export CI_REGISTRY="index.docker.io"
+  export CI_APPLICATION_REPOSITORY=\$CI_REGISTRY/\$CI_PROJECT_PATH
+  export CI_APPLICATION_TAG=\$CI_COMMIT_REF_SLUG
+  export CI_CONTAINER_NAME=ci_job_build_\${CI_JOB_ID}
+  export TILLER_NAMESPACE="kube-system"
+
+  function deploy() {
+    echo \$KUBE_NAMESPACE
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+    helm dep build reddit
+
+    # for microservice in \$(helm dep ls | grep "file://" | awk '{print \$1}') ; do
+    #   SET_VERSION="\$SET_VERSION \ --set \$microservice.image.tag='\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/ui/raw/master/VERSION)' "
+
+    helm upgrade --install \
+      --wait \
+      --set ui.ingress.host="\$host" \
+      --set ui.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/ui/raw/master/VERSION)" \
+      --set post.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/post/raw/master/VERSION)" \
+      --set comment.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/comment/raw/master/VERSION)" \
+      --namespace="\$KUBE_NAMESPACE" \
+      --version="\$CI_PIPELINE_ID-\$CI_JOB_ID" \
+      "\$name" \
+      reddit
+  }
+
+  function install_dependencies() {
+
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.7.2-linux-amd64.tar.gz | tar zx
+
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  }
+
+  function ensure_namespace() {
+    kubectl describe namespace "\$KUBE_NAMESPACE" || kubectl create namespace "\$KUBE_NAMESPACE"
+  }
+
+  function install_tiller() {
+    echo "Checking Tiller..."
+    helm init --upgrade
+    kubectl rollout status -n "\$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    if ! helm version --debug; then
+      echo "Failed to init Tiller."
+      return 1
+    fi
+    echo ""
+  }
+
+  function delete() {
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+    helm delete "\$name" || true
+  }
+
+before_script:
+  - *auto_devops
+EOF
+```
