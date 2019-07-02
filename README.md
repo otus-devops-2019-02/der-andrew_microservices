@@ -3647,3 +3647,1267 @@ pvc-a9ee6fa2-9a98-11e9-8595-42010a800259   15Gi       RWO            Delete     
 pvc-e28041eb-9a9b-11e9-8595-42010a800259   10Gi       RWO            Delete           Bound       dev/mongo-pvc-dynamic   fast                    3m11s
 reddit-mongo-disk                          25Gi       RWO            Retain           Available                                                   30m
 ```
+
+
+
+
+# CI/CD в Kubernetes №27
+
+## Helm
+- Install Helm.
+```
+wget 'https://get.helm.sh/helm-v2.14.1-linux-amd64.tar.gz'
+tar -xzf helm-v2.14.1-linux-amd64.tar.gz linux-amd64/helm
+sudo mv linux-amd64/helm /usr/local/bin
+rm -dfr linux-amd64 helm-v2.14.1-linux-amd64.tar.gz
+```
+- Install Tiller.
+```
+cat << EOF > tiller.yml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tiller
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: tiller
+    namespace: kube-system
+EOF
+
+kubectl apply -f tiller.yml
+```
+- Запустим tiller-сервер `helm init --service-account tiller`.
+- Проверим `kubectl get pods -n kube-system --selector app=helm`.
+```
+NAME                             READY   STATUS    RESTARTS   AGE
+tiller-deploy-7b659b7fbd-xnn62   1/1     Running   0          74s
+```
+
+## Charts
+- Создайте директорию Charts в папке kubernetes со следующей структурой директорий:
+```
+kubernetes
+  ├──Charts
+     ├── comment
+     ├── post
+     ├── reddit
+     └── ui
+mkdir Charts
+cd Charts
+for d in comment post reddit ui; do mkdir $d;done
+cd ..
+tree Charts
+```
+- Создание чарта для ui.
+```
+cd Charts
+cat << EOF > ui/Chart.yaml
+name: ui
+version: 1.0.0
+description: OTUS reddit application UI
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+```
+- Создание шаблонов для ui.
+```
+mkdir ui/templates
+for f in deployment ingress service; do git mv ../reddit/ui-$f.yml ui/templates/$f.yaml;done
+```
+- Установим Chart.
+```
+helm install --name test-ui-1 ui/
+```
+- Проверяем `helm ls`
+- Шаблонизируем chart-ы.
+```
+cat << EOF > ui/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: 9292
+  selector:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+EOF
+
+cat << EOF > ui/templates/deployment.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: avzhalnin/ui
+        name: ui
+        ports:
+        - containerPort: 9292
+          name: ui
+          protocol: TCP
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+
+
+cat << EOF > ui/templates/ingress.yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: {{ .Release.Name }}-{{ .Chart.Name }}
+          servicePort: 9292
+EOF
+```
+- Определим значения собственных переменных 
+```
+cat << EOF > ui/values.yaml
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: avzhalnin/ui
+  tag: latest
+EOF
+```
+- Установим несколько релизов
+```
+helm install ui --name ui-1
+helm install ui --name ui-2
+helm install ui --name ui-3
+```
+- Должны появиться 3 ingress'а `kubectl get ingress`
+- Кастомизируем установку своими переменными (образ и порт).
+```
+cat << EOF > ui/templates/deployment.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: ui
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: ui
+          protocol: TCP
+        env:
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+
+cat << EOF > ui/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+EOF
+
+cat << EOF > ui/templates/ingress.yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: {{ .Release.Name }}-{{ .Chart.Name }}
+          servicePort: {{ .Values.service.externalPort }}
+EOF
+```
+- Обновим чарты.
+```
+helm upgrade ui-1 ui/
+helm upgrade ui-2 ui/
+helm upgrade ui-3 ui/
+```
+- Осталось собрать пакеты для остальных компонент.
+```
+mkdir post/templates
+
+cat << EOF > post/Chart.yaml
+name: post
+version: 1.0.0
+description: OTUS reddit application POST
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+
+
+cat << EOF > post/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: post
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: post
+    release: {{ .Release.Name }}
+EOF
+
+
+cat << EOF > post/templates/deployment.yaml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: post
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: post
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: post
+      labels:
+        app: reddit
+        component: post
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: post
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: post
+          protocol: TCP
+        env:
+        - name: POST_DATABASE_HOST
+          value: {{ .Values.databaseHost | default (printf "%s-mongodb" .Release.Name) }}
+EOF
+
+
+cat << EOF > post/values.yaml
+---
+service:
+  internalPort: 5000
+  externalPort: 5000
+
+image:
+  repository: avzhalnin/post
+  tag: latest
+
+databaseHost:
+EOF
+
+
+
+mkdir comment/templates
+
+cat << EOF > comment/Chart.yaml
+name: comment
+version: 1.0.0
+description: OTUS reddit application COMMENT
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+
+
+cat << EOF > comment/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+EOF
+
+
+cat << EOF > comment/templates/deployment.yaml
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: comment
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: comment
+      labels:
+        app: reddit
+        component: comment
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: comment
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: comment
+          protocol: TCP
+        env:
+        - name: COMMENT_DATABASE_HOST
+          value: {{ .Values.databaseHost | default (printf "%s-mongodb" .Release.Name) }}
+EOF
+
+
+
+cat << EOF > comment/values.yaml
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: avzhalnin/comment
+  tag: latest
+
+databaseHost:
+EOF
+```
+- Helper for comment.
+```
+cat << EOF > comment/templates/_helpers.tpl
+{{- define "comment.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+```
+- Use helper.
+```
+cat << EOF > comment/templates/service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "comment.fullname" . }}
+  labels:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.service.externalPort }}
+    protocol: TCP
+    targetPort: {{ .Values.service.internalPort }}
+  selector:
+    app: reddit
+    component: comment
+    release: {{ .Release.Name }}
+EOF
+```
+- Helper for post and ui.
+```
+cat << EOF > post/templates/_helpers.tpl
+{{- define "post.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+
+cat << EOF > ui/templates/_helpers.tpl
+{{- define "ui.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name }}
+{{- end -}}
+EOF
+```
+
+
+## Управление зависимостями
+- Создайте reddit/Chart.yaml
+```
+cat << EOF > reddit/Chart.yaml
+name: reddit
+version: 1.0.0
+description: OTUS simple reddit application
+maintainers:
+  - name: AndrewZ
+    email: andrewz@gmail.com
+appVersion: 1.0
+EOF
+```
+- Создайте пустой reddit/values.yaml
+```
+touch reddit/values.yaml
+```
+- В директории Chart'а reddit создадим
+```
+cat << EOF > reddit/requirements.yaml
+dependencies:
+  - name: ui
+    version: "1.0.0"
+    repository: "file://../ui"
+  - name: post
+    version: 1.0.0
+    repository: file://../post
+  - name: comment
+    version: 1.0.0
+    repository: file://../comment
+EOF
+```
+- Нужно загрузить зависимости (когда Chart’ не упакован в tgz архив)
+```
+helm dep update
+```
+- Chart для базы данных не будем создавать вручную. Возьмем готовый.
+- Найдем Chart в общедоступном репозитории `helm search mongo`
+- Обновим зависимости.
+```
+cat << EOF > reddit/requirements.yaml
+dependencies:
+  - name: ui
+    version: "1.0.0"
+    repository: "file://../ui"
+  - name: post
+    version: 1.0.0
+    repository: file://../post
+  - name: comment
+    version: 1.0.0
+    repository: file://../comment
+  - name: mongodb
+    version: 0.4.18
+    repository: https://kubernetes-charts.storage.googleapis.com
+EOF
+```
+- Выгрузим зависимости `helm dep update`
+- Установим наше приложение:
+```
+cd ..
+helm install reddit --name reddit-test
+```
+- Есть проблема с тем, что UI-сервис не знает как правильно ходить в post и comment сервисы. Ведь их имена теперь динамические и зависят от имен чартов В Dockerfile UI-сервиса уже заданы переменные окружения. Надо, чтобы они указывали на нужные бекенды.
+- Добавим в ui/deployments.yaml
+```
+cat << EOF > ui/deployments.yaml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: ui
+    release: {{ .Release.Name }}
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: reddit
+      component: ui
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: ui
+      labels:
+        app: reddit
+        component: ui
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: ui
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+          name: ui
+          protocol: TCP
+        env:
+        - name: POST_SERVICE_HOST
+          value: {{ .Values.postHost | default (printf "%s-post" .Release.Name) }}
+        - name: POST_SERVICE_PORT
+          value: {{ .Values.postPort | default "5000" | quote }}
+        - name: COMMENT_SERVICE_HOST
+          value: {{ .Values.commentHost | default (printf "%s-comment".Release.Name) }}
+        - name: COMMENT_SERVICE_PORT
+          value: {{ .Values.commentPort | default "9292" | quote }}
+        - name: ENV
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+EOF
+```
+- Создадим reddit/values.yaml
+```
+cat << EOF > reddit/values.yaml
+comment:
+  image:
+    repository: avzhalnin/comment
+    tag: latest
+  service:
+    externalPort: 9292
+
+post:
+  image:
+    repository: avzhalnin/post
+    tag: latest
+    service:
+      externalPort: 5000
+
+ui:
+  image:
+    repository: avzhalnin/ui
+    tag: latest
+    service:
+      externalPort: 9292
+EOF
+```
+- После обновления UI - нужно обновить зависимости чарта reddit. `helm dep update ./reddit`
+- Обновите релиз, установленный в k8s `helm upgrade reddit-test ./reddit`
+- Проверяем
+http://35.244.135.236/
+
+
+## GitLab+Kubernetes
+- Добавили bigpool в кластер с более мощной виртуалкой.
+- Отключите RBAC (в настройках кластера - Устаревшие права доступа Legacy Authorization) для упрощения работы. Gitlab-Omnibus пока не подготовлен для этого, а самим это в рамках аботы смысла делать нет.
+
+## Установим GitLab
+- Добавим репозиторий Gitlab `helm repo add gitlab https://charts.gitlab.io`.
+- Мы будем менять конфигурацию Gitlab, поэтому скачаем Chart.
+```
+helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untar
+cd gitlab-omnibus
+```
+- Поправьте gitlab-omnibus/values.yaml
+```
+cat << EOF > values.yaml
+# Default values for kubernetes-gitlab-demo.
+# This is a YAML-formatted file.
+
+# Required variables
+
+# baseDomain is the top-most part of the domain. Subdomains will be generated
+# for gitlab, mattermost, registry, and prometheus.
+# Recommended to set up an A record on the DNS to *.your-domain.com to point to
+# the baseIP
+# e.g. *.your-domain.com.	A	300	baseIP
+baseDomain: example.com
+
+# legoEmail is a valid email address used by Let's Encrypt. It does not have to
+# be at the baseDomain.
+legoEmail: you@example.com
+
+# Optional variables
+# baseIP is an externally provisioned static IP address to use instead of the provisioned one.
+# baseIP: 35.184.199.209
+nameOverride: gitlab
+# \`ce\` or \`ee\`
+gitlab: ce
+gitlabCEImage: gitlab/gitlab-ce:10.1.0-ce.0
+gitlabEEImage: gitlab/gitlab-ee:10.1.0-ee.0
+postgresPassword: NDl1ZjNtenMxcWR6NXZnbw==
+initialSharedRunnersRegistrationToken: "tQtCbx5UZy_ByS7FyzUH"
+mattermostAppSecret: NDl1ZjNtenMxcWR6NXZnbw==
+mattermostAppUID: aadas
+redisImage: redis:3.2.10
+redisDedicatedStorage: true
+#redisStorageSize: 5Gi
+redisAccessMode: ReadWriteOnce
+postgresImage: postgres:9.6.5
+# If you disable postgresDedicatedStorage, you should consider bumping up gitlabRailsStorageSize
+postgresDedicatedStorage: true
+postgresAccessMode: ReadWriteOnce
+#postgresStorageSize: 30Gi
+gitlabDataAccessMode: ReadWriteOnce
+#gitlabDataStorageSize: 30Gi
+gitlabRegistryAccessMode: ReadWriteOnce
+#gitlabRegistryStorageSize: 30Gi
+gitlabConfigAccessMode: ReadWriteOnce
+#gitlabConfigStorageSize: 1Gi
+gitlabRunnerImage: gitlab/gitlab-runner:alpine-v10.1.0
+# Valid values for provider are \`gke\` for Google Container Engine. Leaving it blank (or any othervalue) will disable fast disk options.
+provider: gke
+
+## Storage Class Options
+## If defined, volume.beta.kubernetes.io/storage-class: <storageClass>
+## If not defined, but provider is gke, will use SSDs
+## Otherwise default: volume.alpha.kubernetes.io/storage-class: default
+#gitlabConfigStorageClass: default
+#gitlabDataStorageClass: default
+#gitlabRegistryStorageClass: default
+#postgresStorageClass: default
+#redisStorageClass: default
+
+healthCheckToken: 'SXBAQichEJasbtDSygrD'
+# Optional, for GitLab EE images only
+#gitlabEELicense: base64-encoded-license
+
+gitlab-runner:
+  checkInterval: 1
+  # runnerRegistrationToken must equal initialSharedRunnersRegistrationToken
+  runnerRegistrationToken: "tQtCbx5UZy_ByS7FyzUH"
+  # resources:
+  #   limits:
+  #     memory: 500Mi
+  #     cpu: 600m
+  #   requests:
+  #     memory: 500Mi
+  #     cpu: 600m
+  runners:
+    privileged: true
+    ## Build Container specific configuration
+    ##
+    # builds:
+    #   cpuLimit: 200m
+    #   memoryLimit: 256Mi
+    #   cpuRequests: 100m
+    #   memoryRequests: 128Mi
+
+    ## Service Container specific configuration
+    ##
+    # services:
+    #   cpuLimit: 200m
+    #   memoryLimit: 256Mi
+    #   cpuRequests: 100m
+    #   memoryRequests: 128Mi
+
+    ## Helper Container specific configuration
+    ##
+    # helpers:
+    #   cpuLimit: 200m
+    #   memoryLimit: 256Mi
+    #   cpuRequests: 100m
+    #   memoryRequests: 128Mi
+EOF
+```
+- Поправить gitlab-omnibus/templates/gitlab/gitlab-svc.yaml 
+```
+cat << EOF > templates/gitlab/gitlab-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  selector:
+    name: {{ template "fullname" . }}
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: ssh
+    - name: mattermost
+      port: 8065
+      targetPort: mattermost
+    - name: registry
+      port: 8105
+      targetPort: registry
+    - name: workhorse
+      port: 8005
+      targetPort: workhorse
+    - name: prometheus
+      port: 9090
+      targetPort: prometheus
+    - name: web
+      port: 80
+      targetPort: workhorse
+EOF
+```
+- Поправить в gitlab-omnibus/templates/gitlab-config.yaml
+```
+cat << EOF > templates/gitlab-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}-config
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  external_scheme: http
+  external_hostname: {{ template "fullname" . }}
+  registry_external_scheme: https
+  registry_external_hostname: registry.{{ .Values.baseDomain }}
+  mattermost_external_scheme: https
+  mattermost_external_hostname: mattermost.{{ .Values.baseDomain }}
+  mattermost_app_uid: {{ .Values.mattermostAppUID }}
+  postgres_user: gitlab
+  postgres_db: gitlab_production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "fullname" . }}-secrets
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+data:
+  postgres_password: {{ .Values.postgresPassword }}
+  initial_shared_runners_registration_token: {{ default "" .Values.initialSharedRunnersRegistrationToken | b64enc | quote }}
+  mattermost_app_secret: {{ .Values.mattermostAppSecret | b64enc | quote }}
+{{- if .Values.gitlabEELicense }}
+  gitlab_ee_license: {{ .Values.gitlabEELicense | b64enc | quote }}
+{{- end }}
+EOF
+```
+- Поправить в `gitlab-omnibus/templates/ingress/gitlab-ingress.yaml`
+```
+cat << EOF > templates/ingress/gitlab-ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "fullname" . }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  tls:
+  - hosts:
+    - gitlab.{{ .Values.baseDomain }}
+    - registry.{{ .Values.baseDomain }}
+    - mattermost.{{ .Values.baseDomain }}
+    - prometheus.{{ .Values.baseDomain }}
+    secretName: gitlab-tls
+  rules:
+  - host: {{ template "fullname" . }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8005
+  - host: registry.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8105
+  - host: mattermost.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 8065
+  - host: prometheus.{{ .Values.baseDomain }}
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: {{ template "fullname" . }}
+          servicePort: 9090
+---
+EOF
+```
+- Установим Gitlab `helm install --name gitlab . -f values.yaml`.
+- Должно пройти несколько минут. Найдите выданный IP-адрес ingress-контроллера nginx. `kubectl get service -n nginx-ingress nginx`
+```
+NAME    TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)                                   AGE
+nginx   LoadBalancer   10.11.253.79   35.238.203.247   80:31428/TCP,443:31374/TCP,22:30531/TCP   2m53s
+```
+- Поместите запись в локальный файл /etc/hosts (поставьте свой IP-адрес):
+```
+sudo sh -c 'echo "35.238.203.247 gitlab-gitlab staging production" >> /etc/hosts'
+```
+- Запустить
+http://gitlab-gitlab/
+- Создать группу и проекты.
+- В директории Gitlab_ci/ui:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/ui.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/comment:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/comment.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/post:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/post.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- В директории Gitlab_ci/reddit-deploy:
+```
+git init
+git remote add origin http://gitlab-gitlab/avzhalnin/reddit-deploy.git
+git add .
+git commit -am 'Init'
+git push origin master
+```
+- Для ui добавим 
+```
+cat << EOF > .gitlab-ci.yml
+image: alpine:latest
+
+stages:
+  - build
+  - test
+  - review
+  - release
+
+build:
+  stage: build
+  image: docker:git
+  services:
+    - docker:dind
+  script:
+    - setup_docker
+    - build
+  variables:
+    DOCKER_DRIVER: overlay2
+  only:
+    - branches
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - branches
+
+release:
+  stage: release
+  image: docker
+  services:
+    - docker:dind
+  script:
+    - setup_docker
+    - release
+  only:
+    - master
+
+review:
+  stage: review
+  script:
+    - install_dependencies
+    - ensure_namespace
+    - install_tiller
+    - deploy
+  variables:
+    KUBE_NAMESPACE: review
+    host: \$CI_PROJECT_PATH_SLUG-\$CI_COMMIT_REF_SLUG
+  environment:
+    name: review/\$CI_PROJECT_PATH/\$CI_COMMIT_REF_NAME
+    url: http://\$CI_PROJECT_PATH_SLUG-\$CI_COMMIT_REF_SLUG
+  only:
+    refs:
+      - branches
+    kubernetes: active
+  except:
+    - master
+
+.auto_devops: &auto_devops |
+  [[ "\$TRACE" ]] && set -x
+  export CI_REGISTRY="index.docker.io"
+  export CI_APPLICATION_REPOSITORY=\$CI_REGISTRY/\$CI_PROJECT_PATH
+  export CI_APPLICATION_TAG=\$CI_COMMIT_REF_SLUG
+  export CI_CONTAINER_NAME=ci_job_build_\${CI_JOB_ID}
+  export TILLER_NAMESPACE="kube-system"
+
+  function deploy() {
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+
+    if [[ "\$track" != "stable" ]]; then
+      name="\$name-\$track"
+    fi
+
+    echo "Clone deploy repository..."
+    git clone http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/reddit-deploy.git
+
+    echo "Download helm dependencies..."
+    helm dep update reddit-deploy/reddit
+
+    echo "Deploy helm release \$name to \$KUBE_NAMESPACE"
+    helm upgrade --install \
+      --wait \
+      --set ui.ingress.host="\$host" \
+      --set \$CI_PROJECT_NAME.image.tag=\$CI_APPLICATION_TAG \
+      --namespace="\$KUBE_NAMESPACE" \
+      --version="\$CI_PIPELINE_ID-\$CI_JOB_ID" \
+      "\$name" \
+      reddit-deploy/reddit/
+  }
+
+  function install_dependencies() {
+
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://storage.googleapis.com/pub/gsutil.tar.gz | tar -xz -C \$HOME
+    export PATH=\${PATH}:\$HOME/gsutil
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.9.1-linux-amd64.tar.gz | tar zx
+
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl  -o /usr/bin/sync-repo.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/sync-repo.sh
+    chmod a+x /usr/bin/sync-repo.sh
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  }
+
+  function setup_docker() {
+    if ! docker info &>/dev/null; then
+      if [ -z "\$DOCKER_HOST" -a "\$KUBERNETES_PORT" ]; then
+        export DOCKER_HOST='tcp://localhost:2375'
+      fi
+    fi
+  }
+
+  function ensure_namespace() {
+    kubectl describe namespace "\$KUBE_NAMESPACE" || kubectl create namespace "\$KUBE_NAMESPACE"
+  }
+
+  function release() {
+
+    echo "Updating docker images ..."
+
+    if [[ -n "\$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "\$CI_REGISTRY_USER" -p "\$CI_REGISTRY_PASSWORD"
+      echo ""
+    fi
+
+    docker pull "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG"
+    docker tag "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG" "\$CI_APPLICATION_REPOSITORY:\$(cat VERSION)"
+    docker push "\$CI_APPLICATION_REPOSITORY:\$(cat VERSION)"
+    echo ""
+  }
+
+  function build() {
+
+    echo "Building Dockerfile-based application..."
+    echo `git show --format="%h" HEAD | head -1` > build_info.txt
+    echo `git rev-parse --abbrev-ref HEAD` >> build_info.txt
+    docker build -t "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG" .
+
+    if [[ -n "\$CI_REGISTRY_USER" ]]; then
+      echo "Logging to GitLab Container Registry with CI credentials..."
+      docker login -u "\$CI_REGISTRY_USER" -p "\$CI_REGISTRY_PASSWORD"
+      echo ""
+    fi
+
+    echo "Pushing to GitLab Container Registry..."
+    docker push "\$CI_APPLICATION_REPOSITORY:\$CI_APPLICATION_TAG"
+    echo ""
+  }
+
+  function install_tiller() {
+    echo "Checking Tiller..."
+    helm init --upgrade
+    kubectl rollout status -n "\$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    if ! helm version --debug; then
+      echo "Failed to init Tiller."
+      return 1
+    fi
+    echo ""
+  }
+
+before_script:
+  - *auto_devops
+EOF
+```
+- После деплоя появилась ветка в кубере!
+```
+ helm ls
+NAME                    REVISION        UPDATED                         STATUS          CHART                   APP VERSION     NAMESPACE
+gitlab                  1               Mon Jul  1 16:51:22 2019        DEPLOYED        gitlab-omnibus-0.1.37                   default
+review-avzhalnin-2lvl84 1               Mon Jul  1 20:50:54 2019        DEPLOYED        reddit-1.0.0            1               review
+```
+- Насмотревшись, удалим руками через gitlab. `helm ls`
+```NAME                    REVISION        UPDATED                         STATUS          CHART                   APP VERSION     NAMESPACE
+gitlab                  1               Mon Jul  1 16:51:22 2019        DEPLOYED        gitlab-omnibus-0.1.37                   default
+review-avzhalnin-0g3bjj 1               Mon Jul  1 21:03:11 2019        DEPLOYED        reddit-1.0.0            1               review
+review-avzhalnin-mb4aj8 1               Mon Jul  1 21:03:11 2019        DEPLOYED        reddit-1.0.0            1               review
+```
+- То же самое проделали с comment и post.
+- Теперь создадим staging и production среды для работы приложения. Создайте файл reddit-deploy/.gitlab-ci.yml
+- Этот файл отличается от предыдущих тем, что:
+1. Не собирает docker-образы
+2. Деплоит на статичные окружения (staging и production)
+3. Не удаляет окружения
+```
+cat << EOF > .gitlab-ci.yml
+image: alpine:latest
+
+stages:
+  - test
+  - staging
+  - production
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - triggers
+    - branches
+
+staging:
+  stage: staging
+  script:
+  - install_dependencies
+  - ensure_namespace
+  - install_tiller
+  - deploy
+  variables:
+    KUBE_NAMESPACE: staging
+  environment:
+    name: staging
+    url: http://staging
+  only:
+    refs:
+      - master
+    kubernetes: active
+
+production:
+  stage: production
+  script:
+    - install_dependencies
+    - ensure_namespace
+    - install_tiller
+    - deploy
+  variables:
+    KUBE_NAMESPACE: production
+  environment:
+    name: production
+    url: http://production
+  when: manual
+  only:
+    refs:
+      - master
+    kubernetes: active
+
+.auto_devops: &auto_devops |
+  # Auto DevOps variables and functions
+  [[ "\$TRACE" ]] && set -x
+  export CI_REGISTRY="index.docker.io"
+  export CI_APPLICATION_REPOSITORY=\$CI_REGISTRY/\$CI_PROJECT_PATH
+  export CI_APPLICATION_TAG=\$CI_COMMIT_REF_SLUG
+  export CI_CONTAINER_NAME=ci_job_build_\${CI_JOB_ID}
+  export TILLER_NAMESPACE="kube-system"
+
+  function deploy() {
+    echo \$KUBE_NAMESPACE
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+    helm dep build reddit
+
+    # for microservice in \$(helm dep ls | grep "file://" | awk '{print \$1}') ; do
+    #   SET_VERSION="\$SET_VERSION \ --set \$microservice.image.tag='\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/ui/raw/master/VERSION)' "
+
+    helm upgrade --install \
+      --wait \
+      --set ui.ingress.host="\$host" \
+      --set ui.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/ui/raw/master/VERSION)" \
+      --set post.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/post/raw/master/VERSION)" \
+      --set comment.image.tag="\$(curl http://gitlab-gitlab/\$CI_PROJECT_NAMESPACE/comment/raw/master/VERSION)" \
+      --namespace="\$KUBE_NAMESPACE" \
+      --version="\$CI_PIPELINE_ID-\$CI_JOB_ID" \
+      "\$name" \
+      reddit
+  }
+
+  function install_dependencies() {
+
+    apk add -U openssl curl tar gzip bash ca-certificates git
+    wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub
+    wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk
+    apk add glibc-2.23-r3.apk
+    rm glibc-2.23-r3.apk
+
+    curl https://kubernetes-helm.storage.googleapis.com/helm-v2.7.2-linux-amd64.tar.gz | tar zx
+
+    mv linux-amd64/helm /usr/bin/
+    helm version --client
+
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/\$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x /usr/bin/kubectl
+    kubectl version --client
+  }
+
+  function ensure_namespace() {
+    kubectl describe namespace "\$KUBE_NAMESPACE" || kubectl create namespace "\$KUBE_NAMESPACE"
+  }
+
+  function install_tiller() {
+    echo "Checking Tiller..."
+    helm init --upgrade
+    kubectl rollout status -n "\$TILLER_NAMESPACE" -w "deployment/tiller-deploy"
+    if ! helm version --debug; then
+      echo "Failed to init Tiller."
+      return 1
+    fi
+    echo ""
+  }
+
+  function delete() {
+    track="\${1-stable}"
+    name="\$CI_ENVIRONMENT_SLUG"
+    helm delete "\$name" || true
+  }
+
+before_script:
+  - *auto_devops
+EOF
+```
