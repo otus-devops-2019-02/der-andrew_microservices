@@ -3651,7 +3651,7 @@ reddit-mongo-disk                          25Gi       RWO            Retain     
 
 
 
-# CI/CD в Kubernetes №27
+# CI/CD в Kubernetes №28
 
 ## Helm
 - Install Helm.
@@ -4911,3 +4911,44 @@ before_script:
   - *auto_devops
 EOF
 ```
+
+
+# Kubernetes. Мониторинг и логирование №29
+
+## В настройках кластера:
+• Stackdriver Logging - Отключен
+• Stackdriver Monitoring - Отключен
+• Устаревшие права доступа - Включено
+
+## Из Helm-чарта установим ingress-контроллер nginx
+```
+helm install stable/nginx-ingress --name nginx
+```
+- Найдите IP-адрес, выданный nginx’у `kubectl get svc nginx-nginx-ingress-controller`
+```
+NAME                             TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)                      AGE
+nginx-nginx-ingress-controller   LoadBalancer   10.11.249.158   34.68.195.196   80:31274/TCP,443:30546/TCP   3m3s
+```
+- Добавьте в /etc/hosts
+```
+sudo sh -c 'echo "34.68.195.196 reddit reddit-prometheus reddit-grafana reddit-non-prod production reddit-kibana staging prod" >> /etc/hosts'
+```
+
+## Мониторинг
+
+## Установим Prometheus
+- Загрузим prometheus локально в Charts каталог
+```
+cd kubernetes/Charts && helm fetch —-untar stable/prometheus
+```
+- Создайте внутри директории чарта файл
+```
+ wget 'https://gist.githubusercontent.com/chromko/2bd290f7becdf707cde836ba1ea6ec5c/raw/c17372866867607cf4a0445eb519f9c2c377a0ba/gistfile1.txt' -O custom_values.yaml
+```
+- Запустите Prometheus в k8s из Charsts/prometheus
+```
+helm upgrade prom . -f custom_values.yaml --install
+```
+- Заходим
+http://reddit-prometheus
+- 
