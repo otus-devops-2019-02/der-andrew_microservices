@@ -5008,3 +5008,24 @@ __meta_kubernetes_service_annotation_annotationname
         - action: labelmap
           regex: __meta_kubernetes_service_label_(.+)
 ```
+- Сейчас мы собираем метрики со всех сервисов reddit’а в 1 группе target-ов. Мы можем отделить target-ы компонент друг от друга (по окружениям, по самим компонентам), а также выключать и включать опцию мониторинга для них с помощью все тех же labelов.
+- Например, добавим в конфиг еще 1 job.
+```
+      - job_name: 'reddit-production'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+          - source_labels: [__meta_kubernetes_service_label_app, __meta_kubernetes_namespace]
+            action: keep
+            regex: reddit;(production|staging)+
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: kubernetes_name
+```
+- Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
+- В Target Prometheus появился `reddit-production (15/15 up)`
+- Метрики будут отображаться для всех инстансов приложений в Graph `ui_health_post_availability`.
+- 
