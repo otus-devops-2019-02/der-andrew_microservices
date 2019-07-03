@@ -4976,4 +4976,35 @@ nodeExporter:
 ```
 - Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
 - В Target Prometheus появился `kubernetes-service-endpoints component="node-exporter"`. А в Graph появился `node_exporter_build_info`.
-- 
+
+
+## Метрики приложений
+- Запустите приложение из helm чарта reddit
+```
+helm upgrade reddit-test ./reddit --install
+helm upgrade production --namespace production ./reddit --install
+helm upgrade staging --namespace staging ./reddit --install
+```
+- Раньше мы “хардкодили” адреса/dns-имена наших приложений для сбора метрик с них. Теперь мы можем использовать механизм ServiceDiscovery для обнаружения приложений, запущенных в k8s. Используем действие **keep**, чтобы оставить только эндпоинты сервисов с метками “app=reddit”
+- Модернизируем конфиг prometheus `custom_values.yml`
+```
+- job_name: 'reddit-endpoints'
+  kubernetes_sd_configs:
+    - role: endpoints
+  relabel_configs:
+    - source_labels: [__meta_kubernetes_service_label_app]
+      action: keep
+      regex: reddit
+```
+- Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
+- Мы получили эндпоинты, но что это за поды мы не знаем. Добавим метки k8s Все лейблы и аннотации k8s изначально отображаются в prometheus в формате:
+```
+__meta_kubernetes_service_label_labelname
+__meta_kubernetes_service_annotation_annotationname
+```
+- Изменим custom_values.yml
+```
+      relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_service_label_(.+)
+```
