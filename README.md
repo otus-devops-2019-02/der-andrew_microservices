@@ -4951,4 +4951,18 @@ helm upgrade prom . -f custom_values.yaml --install
 ```
 - Заходим
 http://reddit-prometheus
+- Отметим, что можно собирать метрики cadvisor’а (который уже является частью kubelet) через проксирующий запрос в kube-api-server.
+- Если зайти по ssh на любую из машин кластера и запросить `curl http://localhost:4194/metrics` то получим те же метрики у kubelet напрямую.
+- Но вариант с kube-api предпочтительней, т.к. этот трафик шифруется TLS и требует аутентификации.
+- Все найденные на эндпоинтах метрики сразу же отобразятся в списке (вкладка Graph). Метрики Cadvisor начинаются с `container_`.
+- Cadvisor собирает лишь информацию о потреблении ресурсов и производительности отдельных docker-контейнеров. При этом он ничего не знает о сущностях k8s (деплойменты, репликасеты, …).
+- Для сбора этой информации будем использовать сервис kube-state-metrics. Он входит в чарт Prometheus. Включим его.
+```
+prometheus/custom_values.yml:
+kubeStateMetrics:
+  ## If false, kube-state-metrics will not be installed
+  ##
+  enabled: true
+```
+- Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
 - 
