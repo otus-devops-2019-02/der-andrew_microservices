@@ -4965,4 +4965,15 @@ kubeStateMetrics:
   enabled: true
 ```
 - Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
+- В Target Prometheus появился `kubernetes-service-endpoints component="kube-state-metrics"`. А в Graph появился `kube_deployment_metadata_generation`.
+- По аналогии с kube_state_metrics включите (enabled: true) поды node-exporter в custom_values.yml.
+```
+prometheus/custom_values.yml:
+nodeExporter:
+  ## If false, node-exporter will not be installed
+  ##
+  enabled: true
+```
+- Обновим релиз `helm upgrade prom . -f custom_values.yaml --install`
+- В Target Prometheus появился `kubernetes-service-endpoints component="node-exporter"`. А в Graph появился `node_exporter_build_info`.
 - 
