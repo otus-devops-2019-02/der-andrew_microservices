@@ -5029,4 +5029,14 @@ __meta_kubernetes_service_annotation_annotationname
 - В Target Prometheus появился `reddit-production (15/15 up)`
 - Метрики будут отображаться для всех инстансов приложений в Graph `ui_health_post_availability`.
 - Разбейте конфигурацию job’а `reddit-endpoints` (слайд 24) так, чтобы было 3 job’а для каждой из компонент приложений (post-endpoints, commentendpoints, ui-endpoints), а reddit-endpoints уберите.
-- 
+
+## Визуализация
+- Поставим также grafana с помощью helm в папку Charts.
+```
+helm upgrade --install grafana stable/grafana --set "server.adminPassword=admin" \
+--set "server.service.type=NodePort" \
+--set "server.ingress.enabled=true" \
+--set "server.ingress.hosts={reddit-grafana}"
+```
+- Заходим
+http://reddit-grafana/
